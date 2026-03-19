@@ -414,6 +414,13 @@ def register_assets_tools(mcp) -> None:
                     return {"error": "relationships must be a JSON array of dicts"}
             if not isinstance(relationships, list):
                 return {"error": "relationships must be a list of dicts"}
+            # Auto-fill primary_id/primary_type from display_id when missing
+            if display_id:
+                for rel in relationships:
+                    if "primary_id" not in rel:
+                        rel["primary_id"] = display_id
+                    if "primary_type" not in rel:
+                        rel["primary_type"] = "asset"
             try:
                 payload = {"relationships": relationships}
                 resp = await api_post("relationships/bulk-create", json=payload)
