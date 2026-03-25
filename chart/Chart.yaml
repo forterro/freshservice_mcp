@@ -1,0 +1,17 @@
+apiVersion: v2
+name: freshservice-mcp
+description: Helm chart for the Freshservice MCP Server
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - mcp
+  - freshservice
+  - itsm
+
+home: https://github.com/forterro/freshservice_mcp
+
+maintainers:
+  - name: Forterro IT
+    url: https://github.com/forterro
