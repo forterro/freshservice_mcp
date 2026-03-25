@@ -5,7 +5,7 @@ Exposes 3 tools instead of the original 22:
   • manage_asset_details   — components, assignment history, requests, contracts
   • manage_asset_relationship — CRUD + list + types + job status
 """
-import urllib.parse
+import json
 from typing import Any, Dict, List, Optional
 
 from ..http_client import (
@@ -135,12 +135,14 @@ def register_assets_tools(mcp) -> None:
         if action == "search":
             if not search_query:
                 return {"error": "search_query required for search"}
-            encoded = urllib.parse.quote(f'"{search_query}"')
-            params = {"page": page}
+            params: Dict[str, Any] = {
+                "query": f'"{search_query}"',
+                "page": page,
+            }
             if trashed:
                 params["trashed"] = "true"
             try:
-                resp = await api_get(f"assets?search={encoded}", params=params)
+                resp = await api_get("assets", params=params)
                 resp.raise_for_status()
                 return resp.json()
             except Exception as e:
@@ -150,12 +152,18 @@ def register_assets_tools(mcp) -> None:
         if action == "filter":
             if not filter_query:
                 return {"error": "filter_query required for filter"}
-            encoded = urllib.parse.quote(f'"{filter_query}"')
-            params: Dict[str, Any] = {"page": page}
+            # Freshservice filter expects the value wrapped in double-quotes,
+            # e.g. filter="asset_type_id:50000039936"
+            # Strip any existing outer quotes the caller may have added.
+            fq = filter_query.strip('"')
+            params: Dict[str, Any] = {
+                "filter": f'"{fq}"',
+                "page": page,
+            }
             if include:
                 params["include"] = include
             try:
-                resp = await api_get(f"assets?filter={encoded}", params=params)
+                resp = await api_get("assets", params=params)
                 resp.raise_for_status()
                 return resp.json()
             except Exception as e:
@@ -398,8 +406,24 @@ def register_assets_tools(mcp) -> None:
         if action == "create":
             if not relationships:
                 return {"error": "relationships list required for create"}
+            # Guard: MCP tool params may arrive as a JSON string
+            if isinstance(relationships, str):
+                try:
+                    relationships = json.loads(relationships)
+                except json.JSONDecodeError:
+                    return {"error": "relationships must be a JSON array of dicts"}
+            if not isinstance(relationships, list):
+                return {"error": "relationships must be a list of dicts"}
+            # Auto-fill primary_id/primary_type from display_id when missing
+            if display_id:
+                for rel in relationships:
+                    if "primary_id" not in rel:
+                        rel["primary_id"] = display_id
+                    if "primary_type" not in rel:
+                        rel["primary_type"] = "asset"
             try:
-                resp = await api_post("relationships/bulk-create", json=relationships)
+                payload = {"relationships": relationships}
+                resp = await api_post("relationships/bulk-create", json=payload)
                 resp.raise_for_status()
                 return resp.json()
             except Exception as e:
@@ -408,6 +432,12 @@ def register_assets_tools(mcp) -> None:
         if action == "delete":
             if not relationship_ids:
                 return {"error": "relationship_ids list required for delete"}
+            # Guard: MCP tool params may arrive as a JSON string
+            if isinstance(relationship_ids, str):
+                try:
+                    relationship_ids = json.loads(relationship_ids)
+                except json.JSONDecodeError:
+                    return {"error": "relationship_ids must be a JSON array of ints"}
             ids_str = ",".join(str(i) for i in relationship_ids)
             try:
                 resp = await api_delete(f"relationships?ids={ids_str}")

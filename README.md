@@ -10,118 +10,275 @@ A powerful MCP (Model Context Protocol) server implementation that seamlessly in
 
 - **Enterprise-Grade Freshservice Integration**: Direct, secure communication with Freshservice API endpoints
 - **AI Model Compatibility**: Enables Claude and other AI models to execute service desk operations through Freshservice
-- **Automated ITSM Management**: Efficiently handle ticket creation, updates, responses, and asset management
+- **Modular Architecture**: 35 tools organized into 13 independently loadable scopes — load only what you need
+- **Scope-Based Loading**: Use `FRESHSERVICE_SCOPES` env var or `--scope` CLI arg to control which tool modules are active
+- **Dynamic Form Discovery**: Auto-discover custom fields for tickets, changes, problems, releases, assets
 - **Workflow Acceleration**: Reduce manual intervention in routine IT service tasks
 
-## Supported Freshservice Modules
+## Architecture
 
-**This MCP server currently supports operations across a wide range of Freshservice modules**:
+The server uses a modular scope-based architecture. Each scope registers one or more tools:
 
-- Tickets
-- Changes
-- Conversations
-- Products
-- Requesters
-- Agents
-- Agent Groups
-- Requester Groups
-- Canned Responses
-- Canned Response Folders
-- Workspaces
-- Solution Categories
-- Solution Folders
-- Solution Articles
-- Assets / CMDB
-- Asset Relationships
-- Asset Types
+| Scope | Tools | Description |
+| ----- | ----- | ----------- |
+| `tickets` | `manage_ticket`, `manage_ticket_conversation`, `manage_service_catalog` | Ticket CRUD, conversations, service catalog |
+| `changes` | `manage_change`, `manage_change_note`, `manage_change_task`, `manage_change_time_entry`, `manage_change_approval` | Change requests with full sub-resource support |
+| `problems` | `manage_problem`, `manage_problem_note`, `manage_problem_task`, `manage_problem_time_entry` | Problem management with notes, tasks, time tracking |
+| `releases` | `manage_release`, `manage_release_note`, `manage_release_task`, `manage_release_time_entry` | Release management with notes, tasks, time tracking |
+| `assets` | `manage_asset`, `manage_asset_details`, `manage_asset_relationship` | Assets/CMDB, types, components, relationships |
+| `status_page` | `manage_status_page` | Status pages, maintenance windows, incidents, components |
+| `departments` | `manage_department`, `manage_location` | Department & location management |
+| `agents` | `manage_agent`, `manage_agent_group` | Agent & agent group management |
+| `requesters` | `manage_requester`, `manage_requester_group` | Requester & requester group management |
+| `solutions` | `manage_solution` | Solution categories, folders, articles |
+| `projects` | `manage_project`, `manage_project_task` | Project management (NewGen) — tasks, members, associations, sprints |
+| `products` | `manage_product` | Product catalog management |
+| `misc` | `manage_canned_response`, `manage_workspace` | Canned responses, workspaces |
 
-## Components & Tools
+Additionally, 2 **discovery tools** are always loaded:
 
-The server provides a comprehensive toolkit for Freshservice operations:
+- `discover_form_fields` — Discover custom field definitions for any entity type
+- `clear_field_cache` — Clear cached field definitions
 
-### Ticket Management
+**Total: 35 tools** (33 scoped + 2 discovery)
 
-| Tool | Description | Key Parameters |
-| ---- | ----------- | -------------- |
-| `create_ticket` | Create new service tickets | `subject`, `description`, `source`, `priority`, `status`, `email` |
-| `update_ticket` | Update existing tickets | `ticket_id`, `updates` |
-| `delete_ticket` | Remove tickets | `ticket_id` |
-| `filter_tickets` | Find tickets matching criteria | `query` |
-| `get_ticket_fields` | Retrieve ticket field definitions | None |
-| `get_tickets` | List all tickets with pagination | `page`, `per_page` |
-| `get_ticket_by_id` | Retrieve single ticket details | `ticket_id` |
+## Tools Reference
 
-### Change Management
+Each tool uses a unified `action` parameter to select the operation. Pass the action as the first argument along with the relevant parameters.
 
-| Tool | Description | Key Parameters |
-| ---- | ----------- | -------------- |
-| `get_changes` | List all changes with pagination | `page`, `per_page`, `query` |
-| `filter_changes` | Filter changes with advanced queries | `query`, `page`, `per_page` |
-| `get_change_by_id` | Retrieve single change details | `change_id` |
-| `create_change` | Create new change request | `requester_id`, `subject`, `description`, `priority`, `impact`, `status`, `risk`, `change_type` |
-| `update_change` | Update existing change | `change_id`, `change_fields` |
-| `close_change` | Close change with result explanation | `change_id`, `change_result_explanation` |
-| `delete_change` | Remove change | `change_id` |
-| `get_change_tasks` | Get tasks for a change | `change_id` |
-| `create_change_note` | Add note to change | `change_id`, `body` |
+### Ticket Management (`tickets` scope)
 
-#### 🚨 Important: Query Syntax for Filtering
+**`manage_ticket`** — Actions: `list`, `get`, `create`, `update`, `delete`, `filter`, `get_fields`
 
-When using `get_changes` or `filter_changes` with the `query` parameter, **the query string must be wrapped in double quotes** for the Freshservice API to work correctly:
+| Action | Required Parameters | Optional Parameters |
+| ------ | ------------------- | ------------------- |
+| `list` | — | `page`, `per_page` |
+| `get` | `ticket_id` | `include` |
+| `create` | `subject`, `description`, `email`, `priority`, `status` | `source`, `type`, `group_id`, `agent_id`, `custom_fields` |
+| `update` | `ticket_id` | any updatable field |
+| `delete` | `ticket_id` | — |
+| `filter` | `query` | `page`, `per_page` |
 
-✅ **CORRECT**: `"status:3"`, `"approval_status:1 AND status:<6"`
-❌ **WRONG**: `status:3` (will cause 500 Internal Server Error)
+**`manage_ticket_conversation`** — Actions: `list`, `create_reply`, `create_note`
 
-**Common Query Examples:**
+**`manage_service_catalog`** — Actions: `list`, `get`
 
-- `"status:3"` - Changes awaiting approval
-- `"approval_status:1"` - Approved changes
-- `"approval_status:1 AND status:<6"` - Approved changes that are not closed
-- `"planned_start_date:>'2025-07-14'"` - Changes starting after specific date
-- `"status:3 AND priority:1"` - High priority changes awaiting approval
+### Change Management (`changes` scope)
 
-### Asset / CMDB Management
+**`manage_change`** — Actions: `list`, `get`, `create`, `update`, `delete`, `close`, `filter`, `move`, `get_fields`
 
-| Tool | Description | Key Parameters |
-| ---- | ----------- | -------------- |
-| `get_assets` | List all assets with pagination | `page`, `per_page`, `include`, `order_by`, `order_type`, `trashed`, `workspace_id` |
-| `get_asset_by_id` | Retrieve single asset details | `display_id`, `include` |
-| `create_asset` | Create a new asset | `name`, `asset_type_id`, `impact`, `usage_type`, `description`, `type_fields` |
-| `update_asset` | Update an existing asset | `display_id`, `asset_fields` |
-| `delete_asset` | Delete (trash) an asset | `display_id` |
-| `delete_asset_permanently` | Permanently delete a trashed asset | `display_id` |
-| `restore_asset` | Restore a trashed asset | `display_id` |
-| `search_assets` | Search assets by attributes | `search_query`, `page`, `trashed` |
-| `filter_assets` | Filter assets with advanced queries | `filter_query`, `page`, `include` |
-| `move_asset` | Move asset to another workspace | `display_id`, `workspace_id`, `agent_id`, `group_id` |
-| `get_asset_components` | List hardware components | `display_id` |
-| `get_asset_assignment_history` | View user assignment history | `display_id` |
-| `get_asset_requests` | List associated tickets | `display_id` |
-| `get_asset_contracts` | List associated contracts | `display_id` |
+| Action | Required Parameters | Optional Parameters |
+| ------ | ------------------- | ------------------- |
+| `create` | `requester_id`, `subject`, `description`, `priority`, `impact`, `status`, `risk`, `change_type` | `planning_fields`*, `assets`, `impacted_services`, `custom_fields`, `agent_id`, `group_id` |
+| `update` | `change_id` | any updatable field including `planning_fields`, `impacted_services` |
+| `close` | `change_id` | `body` (result explanation) |
 
-### Asset Relationships
+> *`planning_fields` on create are handled transparently via a 2-step process (POST + PUT) to work around a Freshservice API limitation.
+> **`impacted_services`** is distinct from `assets`: use `assets` for CI associations (`[{"display_id": N}]`) and `impacted_services` for business service impact declarations (`[{"id": N, "status": 1}]`). Service statuses: 1=Operational, 5=Under maintenance, 10=Degraded, 20=Partial outage, 30=Major outage.
 
-| Tool | Description | Key Parameters |
-| ---- | ----------- | -------------- |
-| `get_asset_relationships` | List relationships for an asset | `display_id` |
-| `get_all_relationships` | List all relationships | `page`, `per_page` |
-| `get_relationship_by_id` | View a specific relationship | `relationship_id` |
-| `create_asset_relationships` | Create relationships in bulk | `relationships` |
-| `delete_asset_relationships` | Delete relationships in bulk | `relationship_ids` |
-| `get_relationship_types` | List available relationship types | None |
+**`manage_change_note`** — Actions: `list`, `get`, `create`, `update`, `delete`
 
-### Asset Types
+**`manage_change_task`** — Actions: `list`, `get`, `create`, `update`, `delete`
 
-| Tool | Description | Key Parameters |
-| ---- | ----------- | -------------- |
-| `get_asset_types` | List all asset types | `page`, `per_page` |
-| `get_asset_type_by_id` | View a specific asset type | `asset_type_id` |
+**`manage_change_time_entry`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+**`manage_change_approval`** — Actions: `list`, `get`, `approve`, `reject`
+
+### Problem Management (`problems` scope)
+
+**`manage_problem`** — Actions: `list`, `get`, `create`, `update`, `delete`, `filter`, `close`, `restore`, `get_fields`
+
+| Action | Required Parameters | Optional Parameters |
+| ------ | ------------------- | ------------------- |
+| `create` | `requester_id`, `subject`, `description`, `priority`, `status`, `impact`, `due_by` | `agent_id`, `group_id`, `department_id`, `known_error`, `category`, `analysis_fields`, `assets`, `custom_fields` |
+| `close` | `problem_id` | — |
+
+Priority: 1=Low, 2=Medium, 3=High, 4=Urgent · Status: 1=Open, 2=Change Requested, 3=Closed · Impact: 1=Low, 2=Medium, 3=High
+
+**`manage_problem_note`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+**`manage_problem_task`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+**`manage_problem_time_entry`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+### Release Management (`releases` scope)
+
+**`manage_release`** — Actions: `list`, `get`, `create`, `update`, `delete`, `filter`, `restore`, `get_fields`
+
+| Action | Required Parameters | Optional Parameters |
+| ------ | ------------------- | ------------------- |
+| `create` | `subject`, `description`, `priority`, `status`, `release_type`, `planned_start_date`, `planned_end_date` | `planning_fields`*, `agent_id`, `group_id`, `department_id`, `assets`, `custom_fields` |
+
+> *Like changes, `planning_fields` on create uses transparent 2-step handling.
+
+Priority: 1=Low, 2=Medium, 3=High, 4=Urgent · Status: 1=Open, 2=On hold, 3=In Progress, 4=Incomplete, 5=Completed · Type: 1=Minor, 2=Standard, 3=Major, 4=Emergency
+
+**`manage_release_note`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+**`manage_release_task`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+**`manage_release_time_entry`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+### Asset / CMDB Management (`assets` scope)
+
+**`manage_asset`** — Actions: `list`, `get`, `create`, `update`, `delete`, `delete_permanently`, `restore`, `search`, `filter`, `move`, `get_fields`
+
+**`manage_asset_details`** — Actions: `get_components`, `get_requests`, `get_contracts`, `get_installed_software`, `get_assignment_history`, `list_types`, `get_type`
+
+**`manage_asset_relationship`** — Actions: `list`, `list_all`, `get`, `create`, `delete`, `get_types`
+
+### Status Page (`status_page` scope)
+
+**`manage_status_page`** — Maintenance windows, incidents, service components, and subscribers.
+
+All actions auto-discover `status_page_id` if omitted. Maintenance CRUD requires either `change_id` **or** `maintenance_window_id` as the source entity. Incident CRUD requires `ticket_id`.
+
+ > **Publishing maintenance on the Status Page — workflow:**
+>
+> 1. Check the Change: `manage_change` action=`get` → inspect `maintenance_window`
+> 2. **If `maintenance_window` has an `id`** → use `change_id` directly in `create_maintenance`
+> 3. **If `maintenance_window` is empty `{}`** → create a MW with `manage_maintenance_window` action=`create` passing `change_id` (auto-associates the MW with the Change), then use the returned `maintenance_window_id` in `create_maintenance`
+> 4. Required fields for `create_maintenance`: `title`, `description`, `started_at`, `ended_at`, `impacted_services` (get component IDs via `list_components`)
+
+**`manage_maintenance_window`** — CRUD for Maintenance Windows. Pass `change_id` on create to auto-associate.
+
+| Action | Required Parameters |
+| ------ | ------------------- |
+| `list` | — |
+| `get` | `maintenance_window_id` |
+| `create` | `name`, `start_time`, `end_time` + optional `change_id` (auto-associates) |
+| `update` | `maintenance_window_id` |
+| `delete` | `maintenance_window_id` |
+
+**`manage_status_page`** actions:
+
+| Action | Required Parameters |
+| ------ | ------------------- |
+| **Pages** | |
+| `list_pages` | — |
+| **Service Components** | |
+| `list_components` | — |
+| `get_component` | `component_id` |
+| **Maintenance** (from Change or MW) | |
+| `list_maintenance` | — |
+| `create_maintenance` | `change_id` or `maintenance_window_id`, `title`, `description`, `started_at`, `ended_at`, `impacted_services` |
+| `get_maintenance` | `change_id` or `maintenance_window_id`, `maintenance_id` |
+| `update_maintenance` | `change_id` or `maintenance_window_id`, `maintenance_id` |
+| `delete_maintenance` | `change_id` or `maintenance_window_id`, `maintenance_id` |
+| **Maintenance Updates** | |
+| `list_maintenance_updates` | `change_id` or `maintenance_window_id`, `maintenance_id` |
+| `create_maintenance_update` | `change_id` or `maintenance_window_id`, `maintenance_id`, `body` |
+| `update_maintenance_update` | `change_id` or `maintenance_window_id`, `maintenance_id`, `update_id` |
+| `delete_maintenance_update` | `change_id` or `maintenance_window_id`, `maintenance_id`, `update_id` |
+| **Incidents** (from Ticket) | |
+| `list_incidents` | — |
+| `create_incident` | `ticket_id`, `title` |
+| `get_incident` / `update_incident` / `delete_incident` | `ticket_id`, `incident_id` |
+| **Incident Updates** | |
+| `list_incident_updates` | `ticket_id`, `incident_id` |
+| `create_incident_update` | `ticket_id`, `incident_id`, `body` |
+| `update_incident_update` | `ticket_id`, `incident_id`, `update_id` |
+| `delete_incident_update` | `ticket_id`, `incident_id`, `update_id` |
+| **Statuses** | |
+| `list_maintenance_statuses` / `list_incident_statuses` | — |
+| **Subscribers** | |
+| `list_subscribers` | — |
+| `get_subscriber` | `subscriber_id` |
+| `create_subscriber` | `email` |
+| `update_subscriber` | `subscriber_id` |
+| `delete_subscriber` | `subscriber_id` |
+
+Key fields: `started_at` (ISO datetime), `ended_at`, `impacted_services` (`[{id, status}]`), `notifications` (`[{trigger, options}]`), `description`.
+
+### Project Management (`projects` scope)
+
+**`manage_project`** — Actions: `create`, `update`, `get`, `list`, `delete`, `archive`, `restore`, `get_fields`, `get_templates`, `add_members`, `get_memberships`, `create_association`, `get_associations`, `delete_association`, `get_versions`, `get_sprints`
+
+| Action | Required Parameters | Optional Parameters |
+| ------ | ------------------- | ------------------- |
+| `list` | — | `filter` (`completed`, `incomplete`, `archived`, `open`, `in_progress`), `page`, `per_page` |
+| `get` | `project_id` | — |
+| `create` | `name`, `project_type` (0=Software, 1=Business) | `description`, `key`, `priority_id`, `manager_id`, `start_date`, `end_date`, `visibility`, `sprint_duration`, `project_template_id`, `custom_fields` |
+| `update` | `project_id` | any updatable field |
+| `delete` | `project_id` | — |
+| `archive` / `restore` | `project_id` | — |
+| `get_fields` | — | — |
+| `get_templates` | — | — |
+| `add_members` | `project_id`, `members` (`[{"email": "...", "role": 1}]`) | — |
+| `get_memberships` | `project_id` | — |
+| `create_association` | `project_id`, `module_name` (`tickets`/`problems`/`changes`/`assets`), `ids` | — |
+| `get_associations` | `project_id`, `module_name` | — |
+| `delete_association` | `project_id`, `module_name`, `association_id` | — |
+| `get_versions` / `get_sprints` | `project_id` | — |
+
+Priority: 1=Low, 2=Medium, 3=High, 4=Urgent · Status: 1=Yet to start, 2=In Progress, 3=Completed · Visibility: 0=Private, 1=Public
+
+**`manage_project_task`** — Actions: `create`, `update`, `get`, `list`, `filter`, `delete`, `get_task_types`, `get_task_type_fields`, `get_task_statuses`, `get_task_priorities`, `create_note`, `list_notes`, `update_note`, `delete_note`, `create_association`, `get_associations`, `delete_association`
+
+| Action | Required Parameters | Optional Parameters |
+| ------ | ------------------- | ------------------- |
+| `list` | `project_id` | `filter`, `page`, `per_page` |
+| `get` | `project_id`, `task_id` | — |
+| `create` | `project_id`, `title`, `type_id` | `description`, `status_id`, `priority_id`, `assignee_id`, `reporter_id`, `parent_id`, `planned_start_date`, `planned_end_date`, `planned_effort`, `story_points`, `sprint_id`, `version_id`, `custom_fields` |
+| `update` | `project_id`, `task_id` | any updatable field |
+| `delete` | `project_id`, `task_id` | — |
+| `filter` | `project_id`, `query` | `page`, `per_page` |
+| `get_task_types` | `project_id` | — |
+| `get_task_type_fields` | `project_id`, `type_id` | — |
+| `get_task_statuses` / `get_task_priorities` | `project_id` | — |
+| `create_note` | `project_id`, `task_id`, `content` | — |
+| `list_notes` | `project_id`, `task_id` | — |
+| `update_note` | `project_id`, `task_id`, `note_id`, `content` | — |
+| `delete_note` | `project_id`, `task_id`, `note_id` | — |
+| `create_association` | `project_id`, `task_id`, `module_name`, `ids` | — |
+| `get_associations` | `project_id`, `task_id`, `module_name` | — |
+| `delete_association` | `project_id`, `task_id`, `module_name`, `association_id` | — |
+
+> Use `get_task_types` to discover available type_ids before creating tasks. The task UPDATE endpoint uses a singular path (`/task/` instead of `/tasks/`) — this is handled automatically.
+
+### Departments & Locations (`departments` scope)
+
+**`manage_department`** — Actions: `list`, `get`, `create`, `update`, `delete`, `filter`, `get_fields`
+
+**`manage_location`** — Actions: `list`, `get`, `create`, `update`, `delete`, `filter`
+
+### Agents & Requesters (`agents` / `requesters` scopes)
+
+**`manage_agent`** — Actions: `list`, `get`, `create`, `update`, `delete`, `filter`
+
+**`manage_agent_group`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+**`manage_requester`** — Actions: `list`, `get`, `create`, `update`, `delete`, `filter`, `merge`, `convert_to_agent`
+
+**`manage_requester_group`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+### Solutions, Products, Misc (`solutions` / `products` / `misc` scopes)
+
+**`manage_solution`** — Actions: `list_categories`, `get_category`, `create_category`, `update_category`, `delete_category`, `list_folders`, `get_folder`, `create_folder`, `update_folder`, `delete_folder`, `list_articles`, `get_article`, `create_article`, `update_article`, `delete_article`
+
+**`manage_product`** — Actions: `list`, `get`, `create`, `update`, `delete`
+
+**`manage_canned_response`** — Actions: `list_folders`, `get_folder`, `list_responses`, `get_response`
+
+**`manage_workspace`** — Actions: `list`, `get`
+
+### Query Syntax for Filtering
+
+When using `filter` actions, **the query string is automatically wrapped in double quotes** by the server. Pass the raw query:
+
+```text
+action: "filter", query: "status:3 AND priority:1"
+```
+
+**Common filter examples:**
+
+- `"status:3"` — Changes awaiting approval
+- `"priority:3 AND status:1"` — High priority open problems
+- `"planned_start_date:>'2025-07-14'"` — Changes starting after a date
 
 ## Getting Started
 
 ### Installing via Smithery
-
-To install freshservice_mcp automatically via Smithery:
 
 ```bash
 npx -y @smithery/cli install @effytech/freshservice_mcp --client claude
@@ -129,79 +286,154 @@ npx -y @smithery/cli install @effytech/freshservice_mcp --client claude
 
 ### Prerequisites
 
-- A Freshservice account (sign up at [freshservice.com](https://www.freshservice.com))
+- A Freshservice account ([freshservice.com](https://www.freshservice.com))
 - Freshservice API key
-- `uvx` installed (`pip install uv` or `brew install uv`)
+- Python >= 3.10
 
 ### Configuration
 
-1. Generate your Freshservice API key from the admin panel:
-   - Navigate to Profile Settings → API Settings
-   - Copy your API key for configuration
+Generate your Freshservice API key:
 
-2. Set up your domain and authentication details as shown below
+1. Navigate to **Profile Settings → API Settings**
+2. Copy your API key
 
 ### Usage with Claude Desktop
 
-1. Install Claude Desktop from the [official website](https://claude.ai/desktop)
-2. Add the following configuration to your `claude_desktop_config.json`:
+Add to your `claude_desktop_config.json`:
 
 ```json
 "mcpServers": {
   "freshservice-mcp": {
     "command": "uvx",
-    "args": [
-        "freshservice-mcp"
-    ],
+    "args": ["freshservice-mcp"],
     "env": {
-      "FRESHSERVICE_APIKEY": "<YOUR_FRESHSERVICE_APIKEY>",
-      "FRESHSERVICE_DOMAIN": "<YOUR_FRESHSERVICE_DOMAIN>"
+      "FRESHSERVICE_APIKEY": "<YOUR_API_KEY>",
+      "FRESHSERVICE_DOMAIN": "yourcompany.freshservice.com"
     }
   }
 }
 ```
 
-**Important**: Replace `<YOUR_FRESHSERVICE_APIKEY>` with your actual API key and `<YOUR_FRESHSERVICE_DOMAIN>` with your domain (e.g., `yourcompany.freshservice.com`)
+### Usage with VS Code (Copilot)
+
+Add to `.vscode/mcp.json` in your workspace:
+
+```json
+{
+  "servers": {
+    "freshservice": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["-m", "freshservice_mcp.server"],
+      "env": {
+        "PYTHONPATH": "/path/to/freshservice_mcp/src",
+        "FRESHSERVICE_APIKEY": "<YOUR_API_KEY>",
+        "FRESHSERVICE_DOMAIN": "yourcompany.freshservice.com"
+      }
+    }
+  }
+}
+```
+
+**WSL users** — use `wsl` as the command:
+
+```json
+{
+  "servers": {
+    "freshservice": {
+      "type": "stdio",
+      "command": "wsl",
+      "args": [
+        "-e", "env",
+        "FRESHSERVICE_APIKEY=<YOUR_API_KEY>",
+        "FRESHSERVICE_DOMAIN=yourcompany.freshservice.com",
+        "PYTHONPATH=/path/to/freshservice_mcp/src",
+        "python3", "-m", "freshservice_mcp.server"
+      ]
+    }
+  }
+}
+```
+
+### Scope Selection
+
+By default all 13 scopes are loaded (33 scoped tools + 2 discovery = 35 tools). To load only specific scopes:
+
+**Via environment variable:**
+
+```bash
+FRESHSERVICE_SCOPES=tickets,changes,status_page freshservice-mcp
+```
+
+**Via CLI argument:**
+
+```bash
+freshservice-mcp --scope tickets changes problems
+```
+
+This is useful when you have many MCP servers and need to stay under client tool limits (e.g. VS Code Copilot's 128-tool cap).
 
 ## Example Operations
 
-Once configured, you can ask Claude to perform operations like:
+Once configured, you can ask your AI assistant to:
 
 **Tickets:**
 
-- "Create a new incident ticket with subject 'Network connectivity issue in Marketing department' and description 'Users unable to connect to Wi-Fi in Marketing area', set priority to high"
+- "Create a high priority incident ticket about network connectivity issues in Marketing"
 - "List all critical incidents reported in the last 24 hours"
 - "Update ticket #12345 status to resolved"
 
 **Changes:**
 
 - "Create a change request for scheduled server maintenance next Tuesday at 2 AM"
-- "Update the status of change request #45678 to 'Approved'"
-- "Close change #5092 with result explanation 'Successfully deployed to production. All tests passed.'"
-- "List all pending changes"
+- "Close change #5092 with result explanation 'Successfully deployed to production'"
+- "List all pending changes awaiting approval"
 
-**Other Operations:**
+**Problems:**
 
-- "Show asset details for laptop with asset tag 'LT-2023-087'"
-- "Create a solution article about password reset procedures"
+- "Create a problem for recurring VPN disconnections, assign to Network team"
+- "Add an analysis note to problem #301 with root cause findings"
+
+**Releases:**
+
+- "Create a minor release for the Q1 frontend deployment, planned for March 15-16"
+- "List all in-progress releases"
+
+**Status Page / Maintenance:**
+
+- "Create a maintenance window on the status page linked to change #5100"
+- "List all service components on our public status page"
+
+**Projects:**
+
+- "List all active projects"
+- "Show all tasks in project #2000251059 that are In Progress"
+- "Create a new task in project #2000194127 titled 'Deploy monitoring agent'"
+- "Find all my non-closed tasks across all projects"
 
 **Assets / CMDB:**
 
 - "List all assets in the CMDB"
-- "Create a new hardware asset named 'Dell Latitude 5540' with asset type 'Laptop'"
-- "Search assets with serial number 'HSN12345'"
-- "Filter assets by state 'IN USE' in department 5"
-- "Show all components of asset #42 (CPU, memory, disk, etc.)"
-- "Show the assignment history for asset #115"
-- "List all relationships for asset #42"
-- "Move asset #99 to workspace 3"
+- "Create a new hardware asset named 'Dell Latitude 5540'"
+- "Show all relationships for asset #42"
+
+**Departments & Locations:**
+
+- "List all departments"
+- "Create a new location 'Paris Office' with address details"
 
 ## Testing
 
-For testing purposes, you can start the server manually:
+Start the server manually for testing:
 
 ```bash
-uvx freshservice-mcp --env FRESHSERVICE_APIKEY=<your_api_key> --env FRESHSERVICE_DOMAIN=<your_domain>
+FRESHSERVICE_APIKEY=<key> FRESHSERVICE_DOMAIN=<domain> python3 -m freshservice_mcp.server
+```
+
+Or with uvx:
+
+```bash
+uvx freshservice-mcp --env FRESHSERVICE_APIKEY=<key> --env FRESHSERVICE_DOMAIN=<domain>
 ```
 
 ## Troubleshooting
@@ -209,7 +441,8 @@ uvx freshservice-mcp --env FRESHSERVICE_APIKEY=<your_api_key> --env FRESHSERVICE
 - Verify your Freshservice API key and domain are correct
 - Ensure proper network connectivity to Freshservice servers
 - Check API rate limits and quotas
-- Verify the `uvx` command is available in your PATH
+- If tools appear "disabled" in VS Code Copilot, you may have exceeded the 128-tool limit across all MCP servers — use `FRESHSERVICE_SCOPES` to load fewer scopes
+- Check server logs: the server logs which scopes and how many tools were loaded at startup
 
 ## License
 
