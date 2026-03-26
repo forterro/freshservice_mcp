@@ -1,0 +1,69 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/forterro/freshservice_mcp
+  tag: ""  # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Freshservice MCP server configuration (non-sensitive)
+config:
+  MCP_TRANSPORT: sse
+  MCP_HOST: "0.0.0.0"
+  MCP_PORT: "8000"
+  FRESHSERVICE_DOMAIN: ""
+  # FRESHSERVICE_SCOPES: ""  # comma-separated, empty = all scopes
+
+# -- Sensitive values injected as env vars from a Secret.
+# Set these or use existingSecret.
+secret:
+  FRESHSERVICE_APIKEY: ""
+
+# -- Use an existing Secret instead of creating one.
+# The Secret must contain the keys listed in secret{} above.
+existingSecret: ""
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# -- Extra env vars (list of {name, value} or {name, valueFrom})
+extraEnv: []
+
+# -- Extra envFrom (list of secretRef/configMapRef)
+extraEnvFrom: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+podAnnotations: {}
+podLabels: {}
+
+serviceAccount:
+  create: false
+  name: ""
+
+# -- Liveness / readiness probes (HTTP path on MCP_PORT).
+# SSE transport exposes /sse; streamable-http exposes /mcp.
+probes:
+  liveness:
+    enabled: true
+    path: /sse
+    initialDelaySeconds: 5
+    periodSeconds: 30
+  readiness:
+    enabled: true
+    path: /sse
+    initialDelaySeconds: 3
+    periodSeconds: 10

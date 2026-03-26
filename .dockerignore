@@ -1,0 +1,12 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+tests/
+PR_MESSAGE.md
+LICENSE
+README.md
+smithery.yaml
+chart/
+.python-version
