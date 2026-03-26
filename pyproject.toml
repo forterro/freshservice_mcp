@@ -25,3 +25,7 @@ email = "vijay.r@effy.co.in"
 
 [project.scripts]
 freshservice-mcp = "freshservice_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

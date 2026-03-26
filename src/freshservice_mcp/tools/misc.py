@@ -1,6 +1,6 @@
 """Freshservice MCP — Canned Responses & Workspaces tools (consolidated).
 
-Exposes 2 tools instead of the original 6:
+Exposes 2 tools:
   • manage_canned_response — list + get (responses & folders)
   • manage_workspace       — list + get
 """
@@ -103,3 +103,5 @@ def register_misc_tools(mcp) -> None:
                 return handle_error(e, "get workspace")
 
         return {"error": f"Unknown action '{action}'. Valid: list, get"}
+
+

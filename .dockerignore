@@ -6,7 +6,6 @@ __pycache__
 tests/
 PR_MESSAGE.md
 LICENSE
-README.md
 smithery.yaml
 chart/
 .python-version

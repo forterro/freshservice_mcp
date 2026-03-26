@@ -59,11 +59,11 @@ serviceAccount:
 probes:
   liveness:
     enabled: true
-    path: /sse
+    path: /healthz
     initialDelaySeconds: 5
     periodSeconds: 30
   readiness:
     enabled: true
-    path: /sse
+    path: /healthz
     initialDelaySeconds: 3
     periodSeconds: 10
