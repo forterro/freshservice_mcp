@@ -4,7 +4,7 @@
 # ---------------------------------------------------------------------------
 
 # ── Stage 1: build ─────────────────────────────────────────────────────────
-FROM python:3.13-slim AS builder
+FROM python:3.13-alpine AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -20,7 +20,7 @@ RUN uv sync --frozen --no-dev
 
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────
-FROM python:3.13-slim
+FROM python:3.13-alpine
 
 WORKDIR /app
 
@@ -39,7 +39,7 @@ ENV MCP_TRANSPORT=sse \
 EXPOSE 8000
 
 # Run as non-root
-RUN useradd --create-home --shell /bin/bash mcp
+RUN adduser -D -h /home/mcp -s /bin/sh mcp
 USER mcp
 
 ENTRYPOINT ["freshservice-mcp"]
