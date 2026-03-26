@@ -4,11 +4,20 @@ import base64
 import httpx
 from typing import Optional, Dict, Any
 
+from .auth import forwarded_token_var
 from .config import FRESHSERVICE_DOMAIN, FRESHSERVICE_APIKEY
 
 
 def _auth_header() -> str:
-    """Return the Basic-auth header value."""
+    """Return the Authorization header value.
+
+    Uses the per-user Bearer token forwarded by the MCP gateway when
+    available (HTTP transports behind ContextForge).  Falls back to
+    Basic Auth with the API key (stdio / local dev).
+    """
+    token = forwarded_token_var.get()
+    if token:
+        return f"Bearer {token}"
     return f"Basic {base64.b64encode(f'{FRESHSERVICE_APIKEY}:X'.encode()).decode()}"
 
 

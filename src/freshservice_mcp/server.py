@@ -10,6 +10,11 @@ Usage:
     freshservice-mcp --transport sse          # start as HTTP/SSE server
     FRESHSERVICE_SCOPES=tickets,changes freshservice-mcp  # env-var alternative
     MCP_TRANSPORT=sse MCP_PORT=8000 freshservice-mcp      # HTTP server via env
+
+Auth modes:
+    - stdio / local dev:  FRESHSERVICE_APIKEY (Basic Auth)
+    - HTTP behind gateway: per-user Bearer token forwarded by ContextForge
+      (auto-detected from Authorization header; falls back to API key)
 """
 
 import argparse
@@ -17,8 +22,10 @@ import logging
 import os
 import sys
 
+import anyio
 from mcp.server.fastmcp import FastMCP
 
+from .auth import ForwardedAuthMiddleware
 from .discovery import register_discovery_tools
 from .tools import SCOPE_REGISTRY
 
@@ -124,7 +131,28 @@ def main() -> None:
         host = args.host or os.getenv("MCP_HOST", "0.0.0.0")
         port = args.port or int(os.getenv("MCP_PORT", "8000"))
         log.info("Listening on %s:%d (%s)", host, port, transport)
-        mcp.run(transport=transport, host=host, port=port)
+
+        # Build the Starlette app and wrap it with ForwardedAuthMiddleware
+        # so that per-user Bearer tokens from the gateway are available
+        # to http_client.py via contextvars.
+        if transport == "sse":
+            starlette_app = mcp.sse_app()
+        else:
+            starlette_app = mcp.streamable_http_app()
+        starlette_app = ForwardedAuthMiddleware(starlette_app)
+
+        mcp.settings.host = host
+        mcp.settings.port = port
+
+        import uvicorn
+        config = uvicorn.Config(
+            starlette_app,
+            host=host,
+            port=port,
+            log_level=mcp.settings.log_level.lower(),
+        )
+        server = uvicorn.Server(config)
+        anyio.run(server.serve)
 
 
 if __name__ == "__main__":
