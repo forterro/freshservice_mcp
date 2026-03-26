@@ -87,7 +87,7 @@ wheels = [
 [[package]]
 name = "freshservice-mcp"
 version = "1.0.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "build" },
     { name = "httpx" },

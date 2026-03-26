@@ -16,7 +16,8 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # Install the project itself
 COPY src ./src
-RUN uv sync --frozen --no-dev
+COPY README.md ./
+RUN uv sync --frozen --no-dev --no-editable
 
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────
@@ -38,8 +39,8 @@ ENV MCP_TRANSPORT=sse \
 
 EXPOSE 8000
 
-# Run as non-root
-RUN adduser -D -h /home/mcp -s /bin/sh mcp
-USER mcp
+# Run as non-root (numeric UID required by K8s runAsNonRoot)
+RUN adduser -D -h /home/mcp -s /bin/sh -u 1000 mcp
+USER 1000
 
 ENTRYPOINT ["freshservice-mcp"]

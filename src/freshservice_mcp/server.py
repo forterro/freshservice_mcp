@@ -139,14 +139,32 @@ def main() -> None:
             starlette_app = mcp.sse_app()
         else:
             starlette_app = mcp.streamable_http_app()
-        starlette_app = ForwardedAuthMiddleware(starlette_app)
+
+        # Add a lightweight health endpoint for K8s probes
+        from starlette.responses import PlainTextResponse
+        from starlette.routing import Route
+
+        async def healthz(request):
+            return PlainTextResponse("ok")
+
+        from starlette.applications import Starlette
+        from starlette.routing import Mount
+
+        health_app = Starlette(
+            routes=[
+                Route("/healthz", healthz),
+                Mount("/", app=starlette_app),
+            ],
+        )
+
+        health_app = ForwardedAuthMiddleware(health_app)
 
         mcp.settings.host = host
         mcp.settings.port = port
 
         import uvicorn
         config = uvicorn.Config(
-            starlette_app,
+            health_app,
             host=host,
             port=port,
             log_level=mcp.settings.log_level.lower(),
