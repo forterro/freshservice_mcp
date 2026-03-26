@@ -395,13 +395,60 @@ docker run -e FRESHSERVICE_DOMAIN=yourcompany.freshservice.com \
   ghcr.io/forterro/freshservice_mcp:0.2.0
 ```
 
-A Helm chart is also published:
+### Helm Chart
+
+A Helm chart is published to `oci://ghcr.io/forterro/charts/freshservice-mcp`.
+
+**Quick install (gateway mode — OAuth2, no API key):**
 
 ```bash
-helm install freshservice-mcp oci://ghcr.io/forterro/charts/freshservice-mcp --version 0.2.0
+helm install freshservice-mcp oci://ghcr.io/forterro/charts/freshservice-mcp \
+  --version 0.2.0 \
+  --set config.FRESHSERVICE_DOMAIN=yourcompany.freshservice.com
 ```
 
-In gateway mode (OAuth2), no `FRESHSERVICE_APIKEY` is needed — the gateway forwards per-user tokens.
+**Install with API key (standalone mode):**
+
+```bash
+helm install freshservice-mcp oci://ghcr.io/forterro/charts/freshservice-mcp \
+  --version 0.2.0 \
+  --set config.FRESHSERVICE_DOMAIN=yourcompany.freshservice.com \
+  --set secret.FRESHSERVICE_APIKEY=your-api-key
+```
+
+**Or reference an existing Secret:**
+
+```bash
+helm install freshservice-mcp oci://ghcr.io/forterro/charts/freshservice-mcp \
+  --version 0.2.0 \
+  --set config.FRESHSERVICE_DOMAIN=yourcompany.freshservice.com \
+  --set existingSecret=my-freshservice-secret
+```
+
+#### Chart Values Reference
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `replicaCount` | `1` | Number of pod replicas |
+| `image.repository` | `ghcr.io/forterro/freshservice_mcp` | Container image repository |
+| `image.tag` | `""` (appVersion) | Image tag override |
+| `config.MCP_TRANSPORT` | `sse` | Transport: `sse` or `streamable-http` |
+| `config.MCP_HOST` | `0.0.0.0` | Bind address |
+| `config.MCP_PORT` | `8000` | Bind port |
+| `config.FRESHSERVICE_DOMAIN` | `""` | **Required.** Your Freshservice domain (e.g. `yourcompany.freshservice.com`) |
+| `config.FRESHSERVICE_SCOPES` | `""` (all) | Comma-separated scopes to load |
+| `secret.FRESHSERVICE_APIKEY` | `""` | API key (only for standalone mode, not needed with OAuth2 gateway) |
+| `existingSecret` | `""` | Use an existing K8s Secret instead of creating one |
+| `service.type` | `ClusterIP` | Service type |
+| `service.port` | `8000` | Service port |
+| `resources.requests.cpu` | `50m` | CPU request |
+| `resources.requests.memory` | `128Mi` | Memory request |
+| `resources.limits.cpu` | `500m` | CPU limit |
+| `resources.limits.memory` | `256Mi` | Memory limit |
+| `extraEnv` | `[]` | Extra env vars (`[{name, value}]`) |
+| `extraEnvFrom` | `[]` | Extra envFrom (`[{secretRef: {name}}]`) |
+| `probes.liveness.enabled` | `true` | Enable liveness probe on `/healthz` |
+| `probes.readiness.enabled` | `true` | Enable readiness probe on `/healthz` |
 
 ### Scope Selection
 
