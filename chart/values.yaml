@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: docker.artifactory.k8s.internal.forterro.com/forterro/freshservice-mcp
+  repository: ghcr.io/forterro/freshservice_mcp
   tag: ""  # defaults to .Chart.AppVersion
   pullPolicy: IfNotPresent
 

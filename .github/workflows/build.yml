@@ -1,0 +1,126 @@
+name: Build & Publish
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}  # forterro/freshservice_mcp
+  CHART_NAME: freshservice-mcp
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # ── Docker image ────────────────────────────────────────────────────────
+  docker:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Helm chart (OCI) ───────────────────────────────────────────────────
+  helm:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    needs: docker
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Log in to ghcr.io (Helm OCI)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Determine chart version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="0.0.0-$(echo ${{ github.sha }} | cut -c1-7)"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update Chart.yaml version
+        run: |
+          sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}/" chart/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${{ steps.version.outputs.version }}\"/" chart/Chart.yaml
+
+      - name: Package chart
+        run: helm package chart/ --destination .helm-pkg/
+
+      - name: Push chart to ghcr.io
+        run: helm push .helm-pkg/${{ env.CHART_NAME }}-${{ steps.version.outputs.version }}.tgz oci://${{ env.REGISTRY }}/forterro/charts
+
+  # ── Mirror to Artifactory (optional — for K8s pull) ────────────────────
+  mirror:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: docker
+    steps:
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Artifactory
+        if: vars.ARTIFACTORY_REGISTRY != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.ARTIFACTORY_REGISTRY }}
+          username: ${{ secrets.ARTIFACTORY_USER }}
+          password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+      - name: Mirror image to Artifactory
+        if: vars.ARTIFACTORY_REGISTRY != ''
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          SRC="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}"
+          DST="${{ vars.ARTIFACTORY_REGISTRY }}/forterro/freshservice-mcp:${VERSION}"
+          docker pull "$SRC"
+          docker tag "$SRC" "$DST"
+          docker push "$DST"
