@@ -1,16 +1,75 @@
 """Freshservice MCP — Agents & Groups tools (consolidated).
 
-Exposes 2 tools instead of the original 10:
+Exposes 3 tools instead of the original 10:
+  • get_me             — authenticated user identity
   • manage_agent       — CRUD + list + filter + get_fields
   • manage_agent_group — CRUD + list + get
 """
+import base64
+import json
 from typing import Any, Dict, List, Optional
 
-from ..http_client import api_get, api_post, api_put, handle_error, parse_link_header
+from ..http_client import api_get, api_post, api_put, handle_error, parse_link_header, _auth_header
 
 
 def register_agents_tools(mcp) -> None:
     """Register agent-related tools on *mcp*."""
+
+    # ------------------------------------------------------------------ #
+    #  get_me                                                             #
+    # ------------------------------------------------------------------ #
+    @mcp.tool()
+    async def get_me() -> Dict[str, Any]:
+        """Return the identity of the currently authenticated user.
+
+        When an OAuth token is present (forwarded by ContextForge), the
+        tool decodes the JWT payload to extract the user's email, then
+        queries the Freshservice agents API to return the full agent
+        profile.  Falls back to GET /api/v2/agents/me when using API
+        key authentication (local dev / stdio).
+        """
+        auth = _auth_header()
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+            # Decode the JWT payload (no verification — the gateway
+            # already validated the token).
+            try:
+                payload_b64 = token.split(".")[1]
+                # Add padding if needed
+                padding = 4 - len(payload_b64) % 4
+                if padding != 4:
+                    payload_b64 += "=" * padding
+                payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+                email = payload.get("user") or payload.get("email") or payload.get("unique_name") or payload.get("preferred_username")
+            except Exception as e:
+                return {"error": f"Failed to decode OAuth token: {e}"}
+
+            if not email:
+                return {"error": "Could not extract email from OAuth token payload",
+                        "token_claims": list(payload.keys())}
+
+            # Look up the agent by email
+            try:
+                resp = await api_get("agents", params={
+                    "query": f"email:'{email}'"
+                })
+                resp.raise_for_status()
+                data = resp.json()
+                agents = data.get("agents", [])
+                if agents:
+                    return {"agent": agents[0], "source": "oauth_jwt"}
+                return {"error": f"No agent found for email '{email}'",
+                        "source": "oauth_jwt"}
+            except Exception as e:
+                return handle_error(e, f"look up agent by email '{email}'")
+        else:
+            # API key mode — /agents/me should work
+            try:
+                resp = await api_get("agents/me")
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                return handle_error(e, "get current agent identity")
 
     # ------------------------------------------------------------------ #
     #  manage_agent                                                       #
