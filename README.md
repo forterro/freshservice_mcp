@@ -9,10 +9,12 @@ A powerful MCP (Model Context Protocol) server implementation that seamlessly in
 ## Key Features
 
 - **Enterprise-Grade Freshservice Integration**: Direct, secure communication with Freshservice API endpoints
+- **Dual Authentication**: Per-user OAuth2 tokens (via MCP gateway such as ContextForge) with automatic fallback to API key for local development
 - **AI Model Compatibility**: Enables Claude and other AI models to execute service desk operations through Freshservice
-- **Modular Architecture**: 35 tools organized into 13 independently loadable scopes — load only what you need
+- **Modular Architecture**: 36 tools organized into 13 independently loadable scopes — load only what you need
 - **Scope-Based Loading**: Use `FRESHSERVICE_SCOPES` env var or `--scope` CLI arg to control which tool modules are active
 - **Dynamic Form Discovery**: Auto-discover custom fields for tickets, changes, problems, releases, assets
+- **Multiple Transports**: stdio (local), SSE, and streamable-http for gateway/Kubernetes deployments
 - **Workflow Acceleration**: Reduce manual intervention in routine IT service tasks
 
 ## Architecture
@@ -28,7 +30,7 @@ The server uses a modular scope-based architecture. Each scope registers one or 
 | `assets` | `manage_asset`, `manage_asset_details`, `manage_asset_relationship` | Assets/CMDB, types, components, relationships |
 | `status_page` | `manage_status_page` | Status pages, maintenance windows, incidents, components |
 | `departments` | `manage_department`, `manage_location` | Department & location management |
-| `agents` | `manage_agent`, `manage_agent_group` | Agent & agent group management |
+| `agents` | `get_me`, `manage_agent`, `manage_agent_group` | Current user identity, agent & agent group management |
 | `requesters` | `manage_requester`, `manage_requester_group` | Requester & requester group management |
 | `solutions` | `manage_solution` | Solution categories, folders, articles |
 | `projects` | `manage_project`, `manage_project_task` | Project management (NewGen) — tasks, members, associations, sprints |
@@ -40,7 +42,7 @@ Additionally, 2 **discovery tools** are always loaded:
 - `discover_form_fields` — Discover custom field definitions for any entity type
 - `clear_field_cache` — Clear cached field definitions
 
-**Total: 35 tools** (33 scoped + 2 discovery)
+**Total: 36 tools** (34 scoped + 2 discovery)
 
 ## Tools Reference
 
@@ -244,6 +246,10 @@ Priority: 1=Low, 2=Medium, 3=High, 4=Urgent · Status: 1=Yet to start, 2=In Prog
 
 ### Agents & Requesters (`agents` / `requesters` scopes)
 
+**`get_me`** — Returns the identity of the currently authenticated user.
+
+With OAuth2 tokens (gateway mode), decodes the JWT to extract the user's email and queries the Freshservice agents API. With API key auth (local dev), calls `GET /api/v2/agents/me` directly.
+
 **`manage_agent`** — Actions: `list`, `get`, `create`, `update`, `delete`, `filter`
 
 **`manage_agent_group`** — Actions: `list`, `get`, `create`, `update`, `delete`
@@ -276,6 +282,19 @@ action: "filter", query: "status:3 AND priority:1"
 - `"priority:3 AND status:1"` — High priority open problems
 - `"planned_start_date:>'2025-07-14'"` — Changes starting after a date
 
+## Authentication
+
+The server supports two authentication modes, selected automatically:
+
+| Mode | When | How |
+|------|------|-----|
+| **OAuth2 per-user** | Running behind an MCP gateway (e.g. ContextForge) via SSE/HTTP | Gateway forwards the user's Bearer token in the `Authorization` header. The server extracts it via ASGI middleware and uses it for all Freshservice API calls. Each user authenticates with their own Freshservice identity. |
+| **API key** | Local development via stdio | Uses `FRESHSERVICE_APIKEY` env var with Basic Auth. All requests share the same identity. |
+
+The mode is detected per-request: if an incoming request has a `Bearer` token, OAuth2 is used; otherwise the server falls back to the API key.
+
+> **OAuth2 setup**: Register a Freshservice OAuth app, configure the gateway to handle the OAuth flow, and the server requires zero configuration — tokens are forwarded transparently.
+
 ## Getting Started
 
 ### Installing via Smithery
@@ -287,15 +306,26 @@ npx -y @smithery/cli install @effytech/freshservice_mcp --client claude
 ### Prerequisites
 
 - A Freshservice account ([freshservice.com](https://www.freshservice.com))
-- Freshservice API key
 - Python >= 3.10
+- **For local dev**: Freshservice API key (`FRESHSERVICE_APIKEY`)
+- **For gateway mode**: An MCP gateway that forwards per-user OAuth2 Bearer tokens
 
 ### Configuration
+
+#### Local development (API key)
 
 Generate your Freshservice API key:
 
 1. Navigate to **Profile Settings → API Settings**
 2. Copy your API key
+
+#### Gateway mode (OAuth2)
+
+No server-side credentials needed. The MCP gateway (e.g. ContextForge) authenticates users via OAuth2 and forwards their Bearer tokens. Configure the gateway with:
+
+- **Authorization URL**: `https://yourcompany.freshservice.com/authorize`
+- **Token URL**: `https://yourcompany.freshservice.com/api/v2/oauth/token`
+- **Scopes**: as needed (e.g. all Freshservice scopes)
 
 ### Usage with Claude Desktop
 
@@ -355,9 +385,27 @@ Add to `.vscode/mcp.json` in your workspace:
 }
 ```
 
+### Docker / Kubernetes
+
+The server is published as a container image on GitHub Container Registry:
+
+```bash
+docker run -e FRESHSERVICE_DOMAIN=yourcompany.freshservice.com \
+  -e MCP_TRANSPORT=sse -e MCP_PORT=8000 \
+  ghcr.io/forterro/freshservice_mcp:0.2.0
+```
+
+A Helm chart is also published:
+
+```bash
+helm install freshservice-mcp oci://ghcr.io/forterro/charts/freshservice-mcp --version 0.2.0
+```
+
+In gateway mode (OAuth2), no `FRESHSERVICE_APIKEY` is needed — the gateway forwards per-user tokens.
+
 ### Scope Selection
 
-By default all 13 scopes are loaded (33 scoped tools + 2 discovery = 35 tools). To load only specific scopes:
+By default all 13 scopes are loaded (34 scoped tools + 2 discovery = 36 tools). To load only specific scopes:
 
 **Via environment variable:**
 
@@ -370,6 +418,18 @@ FRESHSERVICE_SCOPES=tickets,changes,status_page freshservice-mcp
 ```bash
 freshservice-mcp --scope tickets changes problems
 ```
+
+### Transport Selection
+
+The server supports three transports:
+
+| Transport | Use case | Command |
+|-----------|----------|---------|
+| `stdio` (default) | Local dev with Claude Desktop / VS Code | `freshservice-mcp` |
+| `sse` | HTTP server behind MCP gateway | `MCP_TRANSPORT=sse freshservice-mcp` |
+| `streamable-http` | HTTP server with streamable responses | `MCP_TRANSPORT=streamable-http freshservice-mcp` |
+
+HTTP transports also accept `MCP_HOST` (default `0.0.0.0`) and `MCP_PORT` (default `8000`).
 
 This is useful when you have many MCP servers and need to stay under client tool limits (e.g. VS Code Copilot's 128-tool cap).
 
@@ -427,7 +487,11 @@ Once configured, you can ask your AI assistant to:
 Start the server manually for testing:
 
 ```bash
+# stdio mode (API key)
 FRESHSERVICE_APIKEY=<key> FRESHSERVICE_DOMAIN=<domain> python3 -m freshservice_mcp.server
+
+# SSE mode (for gateway testing)
+FRESHSERVICE_DOMAIN=<domain> MCP_TRANSPORT=sse python3 -m freshservice_mcp.server
 ```
 
 Or with uvx:
@@ -436,13 +500,18 @@ Or with uvx:
 uvx freshservice-mcp --env FRESHSERVICE_APIKEY=<key> --env FRESHSERVICE_DOMAIN=<domain>
 ```
 
+Health check endpoint (HTTP transports only): `GET /healthz` returns `200 ok`.
+
 ## Troubleshooting
 
-- Verify your Freshservice API key and domain are correct
+- Verify your Freshservice domain is correct (`yourcompany.freshservice.com`)
+- **API key mode**: verify `FRESHSERVICE_APIKEY` is set and valid
+- **OAuth2 mode**: verify the gateway is forwarding the `Authorization: Bearer <token>` header
 - Ensure proper network connectivity to Freshservice servers
 - Check API rate limits and quotas
 - If tools appear "disabled" in VS Code Copilot, you may have exceeded the 128-tool limit across all MCP servers — use `FRESHSERVICE_SCOPES` to load fewer scopes
 - Check server logs: the server logs which scopes and how many tools were loaded at startup
+- Use `get_me` to verify authentication — it returns the current user's agent profile
 
 ## License
 
