@@ -22,6 +22,7 @@ import time
 from typing import Any, Optional
 
 from .auth import forwarded_token_var
+from .telemetry import CACHE_OPS, CACHE_ENTRIES, REDIS_CONNECTED
 
 log = logging.getLogger(__name__)
 
@@ -151,9 +152,13 @@ async def _get_redis():
 async def _redis_get(key: str) -> Optional[str]:
     try:
         client = await _get_redis()
-        return await client.get(key)
+        val = await client.get(key)
+        REDIS_CONNECTED.set(1)
+        return val
     except Exception as exc:
         log.warning("Redis GET failed (key=%s): %s", key, exc)
+        REDIS_CONNECTED.set(0)
+        CACHE_OPS.labels(operation="error", tier="redis").inc()
         return None
 
 
@@ -161,8 +166,11 @@ async def _redis_set(key: str, value: str, ttl: int) -> None:
     try:
         client = await _get_redis()
         await client.set(key, value, ex=ttl)
+        REDIS_CONNECTED.set(1)
     except Exception as exc:
         log.warning("Redis SET failed (key=%s): %s", key, exc)
+        REDIS_CONNECTED.set(0)
+        CACHE_OPS.labels(operation="error", tier="redis").inc()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -197,19 +205,29 @@ def _mem_set(key: str, value: str, ttl: int) -> None:
 async def cache_get(path: str, params: Optional[dict] = None) -> Optional[str]:
     """Return cached response body (JSON string) or None."""
     key = _cache_key(path, params)
+    tier = "reference" if _is_reference_path(path) else "operational"
     if REDIS_URL:
-        return await _redis_get(key)
-    return _mem_get(key)
+        val = await _redis_get(key)
+    else:
+        val = _mem_get(key)
+    if val is not None:
+        CACHE_OPS.labels(operation="hit", tier=tier).inc()
+    else:
+        CACHE_OPS.labels(operation="miss", tier=tier).inc()
+    return val
 
 
 async def cache_set(path: str, body: str, params: Optional[dict] = None) -> None:
     """Store response body in cache with the appropriate TTL."""
     key = _cache_key(path, params)
     ttl = _ttl_for(path)
+    tier = "reference" if _is_reference_path(path) else "operational"
     if REDIS_URL:
         await _redis_set(key, body, ttl)
     else:
         _mem_set(key, body, ttl)
+        CACHE_ENTRIES.set(len(_mem_cache))
+    CACHE_OPS.labels(operation="set", tier=tier).inc()
 
 
 async def cache_invalidate(path: Optional[str] = None) -> int:

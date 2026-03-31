@@ -2,12 +2,14 @@
 import re
 import base64
 import json
+import time
 import httpx
 from typing import Optional, Dict, Any
 
 from .auth import forwarded_token_var
 from .cache import cache_get, cache_set
 from .config import FRESHSERVICE_DOMAIN, FRESHSERVICE_APIKEY
+from .telemetry import API_REQUESTS, API_DURATION, _path_root, trace_span
 
 
 def _auth_header() -> str:
@@ -68,12 +70,19 @@ async def api_get(path: str, params: Optional[Dict[str, Any]] = None,
     ``get_auth_headers()`` for endpoints that require Content-Type
     (e.g. ``/api/v2/pm/`` NewGen endpoints).
     """
-    async with httpx.AsyncClient() as client:
-        return await client.get(
-            api_url(path),
-            headers=headers or get_auth_headers_readonly(),
-            params=params,
-        )
+    root = _path_root(path)
+    start = time.monotonic()
+    async with trace_span("api.get", {"http.method": "GET", "http.path_root": root}):
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                api_url(path),
+                headers=headers or get_auth_headers_readonly(),
+                params=params,
+            )
+    elapsed = time.monotonic() - start
+    API_REQUESTS.labels(method="GET", path_root=root, status_code=resp.status_code).inc()
+    API_DURATION.labels(method="GET", path_root=root).observe(elapsed)
+    return resp
 
 
 async def cached_api_get(path: str, params: Optional[Dict[str, Any]] = None,
@@ -100,24 +109,45 @@ async def cached_api_get(path: str, params: Optional[Dict[str, Any]] = None,
 
 async def api_post(path: str, json: Optional[Any] = None) -> httpx.Response:
     """Perform an authenticated POST request."""
-    async with httpx.AsyncClient() as client:
-        return await client.post(api_url(path), headers=get_auth_headers(), json=json)
+    root = _path_root(path)
+    start = time.monotonic()
+    async with trace_span("api.post", {"http.method": "POST", "http.path_root": root}):
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(api_url(path), headers=get_auth_headers(), json=json)
+    elapsed = time.monotonic() - start
+    API_REQUESTS.labels(method="POST", path_root=root, status_code=resp.status_code).inc()
+    API_DURATION.labels(method="POST", path_root=root).observe(elapsed)
+    return resp
 
 
 async def api_put(path: str, json: Optional[Dict[str, Any]] = None) -> httpx.Response:
     """Perform an authenticated PUT request."""
-    async with httpx.AsyncClient() as client:
-        return await client.put(api_url(path), headers=get_auth_headers(), json=json)
+    root = _path_root(path)
+    start = time.monotonic()
+    async with trace_span("api.put", {"http.method": "PUT", "http.path_root": root}):
+        async with httpx.AsyncClient() as client:
+            resp = await client.put(api_url(path), headers=get_auth_headers(), json=json)
+    elapsed = time.monotonic() - start
+    API_REQUESTS.labels(method="PUT", path_root=root, status_code=resp.status_code).inc()
+    API_DURATION.labels(method="PUT", path_root=root).observe(elapsed)
+    return resp
 
 
 async def api_delete(path: str,
                      headers: Optional[Dict[str, str]] = None) -> httpx.Response:
     """Perform an authenticated DELETE request."""
-    async with httpx.AsyncClient() as client:
-        return await client.delete(
-            api_url(path),
-            headers=headers or get_auth_headers_readonly(),
-        )
+    root = _path_root(path)
+    start = time.monotonic()
+    async with trace_span("api.delete", {"http.method": "DELETE", "http.path_root": root}):
+        async with httpx.AsyncClient() as client:
+            resp = await client.delete(
+                api_url(path),
+                headers=headers or get_auth_headers_readonly(),
+            )
+    elapsed = time.monotonic() - start
+    API_REQUESTS.labels(method="DELETE", path_root=root, status_code=resp.status_code).inc()
+    API_DURATION.labels(method="DELETE", path_root=root).observe(elapsed)
+    return resp
 
 
 def handle_error(e: Exception, action: str = "request") -> Dict[str, Any]:

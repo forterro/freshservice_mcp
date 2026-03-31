@@ -10,3 +10,10 @@ data:
   {{- end }}
   CACHE_TTL_REFERENCE: {{ .Values.cache.ttlReference | default 43200 | quote }}
   CACHE_TTL_OPERATIONAL: {{ .Values.cache.ttlOperational | default 300 | quote }}
+  {{- if .Values.metrics.enabled }}
+  METRICS_ENABLED: "true"
+  {{- end }}
+  {{- if .Values.tracing.enabled }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.tracing.otlpEndpoint | quote }}
+  OTEL_SERVICE_NAME: {{ .Values.tracing.serviceName | default "freshservice-mcp" | quote }}
+  {{- end }}

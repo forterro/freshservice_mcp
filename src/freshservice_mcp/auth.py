@@ -21,6 +21,8 @@ import contextvars
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.requests import Request
 
+from .telemetry import AUTH_MODE
+
 forwarded_token_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "forwarded_token", default=None
 )
@@ -41,6 +43,13 @@ class ForwardedAuthMiddleware:
             request = Request(scope)
             auth = request.headers.get("authorization", "")
             token = auth[7:] if auth.lower().startswith("bearer ") else None
+            # Count auth mode only for MCP traffic (skip infra endpoints)
+            path = request.url.path
+            if path not in ("/healthz", "/metrics"):
+                if token:
+                    AUTH_MODE.labels(mode="bearer").inc()
+                else:
+                    AUTH_MODE.labels(mode="apikey").inc()
             ctx_token = forwarded_token_var.set(token)
             try:
                 await self.app(scope, receive, send)

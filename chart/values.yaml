@@ -90,3 +90,23 @@ probes:
     path: /healthz
     initialDelaySeconds: 3
     periodSeconds: 10
+
+# -- Prometheus metrics endpoint
+metrics:
+  enabled: true
+  path: /metrics
+  # -- Create a ServiceMonitor for Prometheus Operator / Alloy
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    # Extra labels for ServiceMonitor (e.g. release: prometheus)
+    labels: {}
+
+# -- OpenTelemetry tracing (optional)
+tracing:
+  enabled: false
+  # OTLP collector endpoint (gRPC)
+  otlpEndpoint: ""
+  # Override service name (default: freshservice-mcp)
+  serviceName: freshservice-mcp

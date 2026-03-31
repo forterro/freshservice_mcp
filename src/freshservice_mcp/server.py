@@ -27,6 +27,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .auth import ForwardedAuthMiddleware
 from .discovery import register_discovery_tools
+from .telemetry import init_telemetry, metrics_response, instrument_tool
 from .tools import SCOPE_REGISTRY
 
 
@@ -122,8 +123,22 @@ def main() -> None:
         SCOPE_REGISTRY[scope](mcp)
         log.info("Registered scope: %s", scope)
 
+    # Wrap all registered tool handlers with observability instrumentation
+    if hasattr(mcp, "_tool_manager"):
+        for name, tool in mcp._tool_manager._tools.items():
+            if hasattr(tool, "fn") and callable(tool.fn):
+                tool.fn = instrument_tool(tool.fn)
+
     total = len(mcp._tool_manager._tools) if hasattr(mcp, "_tool_manager") else "?"
     log.info("Freshservice MCP server starting — %s tools loaded (scopes: %s)", total, ", ".join(scopes))
+
+    # Initialise telemetry (metrics + optional OTel tracing)
+    from importlib.metadata import version as pkg_version
+    try:
+        ver = pkg_version("freshservice-mcp")
+    except Exception:
+        ver = "dev"
+    init_telemetry(version=ver, transport=transport)
 
     if transport == "stdio":
         mcp.run(transport="stdio")
@@ -141,11 +156,17 @@ def main() -> None:
             starlette_app = mcp.streamable_http_app()
 
         # Add a lightweight health endpoint for K8s probes
-        from starlette.responses import PlainTextResponse
+        from starlette.responses import PlainTextResponse, Response
         from starlette.routing import Route
 
         async def healthz(request):
             return PlainTextResponse("ok")
+
+        async def metrics(request):
+            return Response(
+                content=metrics_response(),
+                media_type="text/plain; version=0.0.4; charset=utf-8",
+            )
 
         from starlette.applications import Starlette
         from starlette.routing import Mount
@@ -153,6 +174,7 @@ def main() -> None:
         health_app = Starlette(
             routes=[
                 Route("/healthz", healthz),
+                Route("/metrics", metrics),
                 Mount("/", app=starlette_app),
             ],
         )
