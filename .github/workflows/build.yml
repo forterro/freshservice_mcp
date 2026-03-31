@@ -87,6 +87,10 @@ jobs:
           sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}/" chart/Chart.yaml
           sed -i "s/^appVersion:.*/appVersion: \"${{ steps.version.outputs.version }}\"/" chart/Chart.yaml
 
+      - name: Set image tag in values.yaml
+        run: |
+          sed -i "s/^  tag: .*/  tag: \"${{ steps.version.outputs.version }}\"/" chart/values.yaml
+
       - name: Package chart
         run: helm package chart/ --destination .helm-pkg/
 
