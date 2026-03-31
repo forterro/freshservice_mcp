@@ -37,7 +37,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from ..http_client import api_delete, api_get, api_post, api_put, handle_error
+from ..http_client import api_delete, cached_api_get as api_get, api_post, api_put, handle_error
 
 # Module-level caches for auto-discovered IDs
 _cached_workspace_id: Optional[int] = None

@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Union
 import httpx
 
 from ..http_client import (
-    api_delete, api_get, api_post, api_put,
+    api_delete, cached_api_get as api_get, api_post, api_put,
     get_auth_headers, handle_error,
 )
 

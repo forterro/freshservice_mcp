@@ -56,9 +56,22 @@ spec:
             {{- with .Values.extraEnvFrom }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- with .Values.extraEnv }}
+          {{- if or .Values.extraEnv .Values.externalRedis.enabled }}
           env:
+            {{- if .Values.externalRedis.enabled }}
+            - name: REDIS_URL
+              {{- if .Values.externalRedis.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalRedis.existingSecret }}
+                  key: {{ .Values.externalRedis.existingSecretKey | default "REDIS_URL" }}
+              {{- else }}
+              value: {{ .Values.externalRedis.url | quote }}
+              {{- end }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
           securityContext:
             allowPrivilegeEscalation: false

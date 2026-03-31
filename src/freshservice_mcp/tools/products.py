@@ -5,7 +5,7 @@ Exposes 1 tool instead of the original 4:
 """
 from typing import Any, Dict, Optional, Union
 
-from ..http_client import api_get, api_post, api_put, handle_error, parse_link_header
+from ..http_client import cached_api_get as api_get, api_post, api_put, handle_error, parse_link_header
 
 
 def register_products_tools(mcp) -> None:

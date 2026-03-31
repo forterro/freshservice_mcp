@@ -5,7 +5,7 @@ Exposes 1 tool instead of the original 13:
 """
 from typing import Any, Dict, List, Optional
 
-from ..http_client import api_get, api_post, api_put, handle_error
+from ..http_client import cached_api_get as api_get, api_post, api_put, handle_error
 
 
 def register_solutions_tools(mcp) -> None:

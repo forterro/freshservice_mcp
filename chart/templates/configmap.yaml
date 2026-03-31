@@ -8,3 +8,5 @@ data:
   {{- range $key, $value := .Values.config }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}
+  CACHE_TTL_REFERENCE: {{ .Values.cache.ttlReference | default 43200 | quote }}
+  CACHE_TTL_OPERATIONAL: {{ .Values.cache.ttlOperational | default 300 | quote }}

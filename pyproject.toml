@@ -11,6 +11,9 @@ dependencies = [
     "pydantic>=2.10.6",
 ]
 
+[project.optional-dependencies]
+redis = ["redis[hiredis]>=5.0.0"]
+
 [[project.authors]]
 name = "Gopi Krishnan"
 email = "gopi@effy.co.in"

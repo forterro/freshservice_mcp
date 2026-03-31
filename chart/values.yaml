@@ -16,6 +16,25 @@ config:
   FRESHSERVICE_DOMAIN: ""
   # FRESHSERVICE_SCOPES: ""  # comma-separated, empty = all scopes
 
+# -- Cache configuration
+cache:
+  # TTL for reference data (agents, departments, groups…) in seconds
+  ttlReference: 43200    # 12 hours
+  # TTL for operational data (tickets, changes, assets…) in seconds
+  ttlOperational: 300    # 5 minutes
+
+# -- External Redis for read caching (optional).
+# When enabled, the server uses Redis for the tiered cache.
+# When disabled, an in-memory TTL cache is used instead.
+externalRedis:
+  enabled: false
+  # Redis connection URL (e.g. redis://:password@host:6379/0)
+  # Set directly or via existingSecret.
+  url: ""
+  # Use an existing Secret containing the Redis URL.
+  existingSecret: ""
+  existingSecretKey: "REDIS_URL"
+
 # -- Sensitive values injected as env vars from a Secret.
 # Set these or use existingSecret.
 secret:

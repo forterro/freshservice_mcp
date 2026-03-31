@@ -12,12 +12,12 @@ WORKDIR /app
 
 # Install dependencies first (layer cache)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project --extra redis
 
 # Install the project itself
 COPY src ./src
 COPY README.md ./
-RUN uv sync --frozen --no-dev --no-editable
+RUN uv sync --frozen --no-dev --no-editable --extra redis
 
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────

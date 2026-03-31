@@ -1,10 +1,12 @@
 """Freshservice MCP — Shared HTTP client utilities."""
 import re
 import base64
+import json
 import httpx
 from typing import Optional, Dict, Any
 
 from .auth import forwarded_token_var
+from .cache import cache_get, cache_set
 from .config import FRESHSERVICE_DOMAIN, FRESHSERVICE_APIKEY
 
 
@@ -72,6 +74,28 @@ async def api_get(path: str, params: Optional[Dict[str, Any]] = None,
             headers=headers or get_auth_headers_readonly(),
             params=params,
         )
+
+
+async def cached_api_get(path: str, params: Optional[Dict[str, Any]] = None,
+                         headers: Optional[Dict[str, str]] = None) -> httpx.Response:
+    """Like ``api_get`` but with transparent read cache.
+
+    Checks the cache first.  On a miss, performs the real HTTP request,
+    caches the response body (if 2xx), and returns it.  The caller gets
+    a real ``httpx.Response`` in all cases.
+    """
+    cached = await cache_get(path, params)
+    if cached is not None:
+        return httpx.Response(
+            status_code=200,
+            json=json.loads(cached),
+            request=httpx.Request("GET", api_url(path)),
+        )
+
+    resp = await api_get(path, params=params, headers=headers)
+    if resp.is_success:
+        await cache_set(path, resp.text, params)
+    return resp
 
 
 async def api_post(path: str, json: Optional[Any] = None) -> httpx.Response:

@@ -9,7 +9,7 @@ import base64
 import json
 from typing import Any, Dict, List, Optional
 
-from ..http_client import api_get, api_post, api_put, handle_error, parse_link_header, _auth_header
+from ..http_client import cached_api_get as api_get, api_post, api_put, handle_error, parse_link_header, _auth_header
 
 
 def register_agents_tools(mcp) -> None:
