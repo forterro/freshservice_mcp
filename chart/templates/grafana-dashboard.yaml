@@ -1,0 +1,12 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "freshservice-mcp.fullname" . }}-dashboard
+  labels:
+    {{- include "freshservice-mcp.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  freshservice-mcp.json: |-
+{{ .Files.Get "dashboards/freshservice-mcp.json" | indent 4 }}
+{{- end }}
