@@ -28,9 +28,28 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-REDIS_URL: str = os.getenv("REDIS_URL", "")
+_REDIS_URL_RAW: str = os.getenv("REDIS_URL", "")
+_REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
 TTL_REFERENCE: int = int(os.getenv("CACHE_TTL_REFERENCE", "43200"))
 TTL_OPERATIONAL: int = int(os.getenv("CACHE_TTL_OPERATIONAL", "300"))
+
+
+def _build_redis_url() -> str:
+    """Merge REDIS_PASSWORD into REDIS_URL if both are set."""
+    url = _REDIS_URL_RAW
+    if not url or not _REDIS_PASSWORD:
+        return url
+    from urllib.parse import quote_plus, urlparse, urlunparse
+    parsed = urlparse(url)
+    if not parsed.password:
+        netloc = f":{quote_plus(_REDIS_PASSWORD)}@{parsed.hostname}"
+        if parsed.port:
+            netloc += f":{parsed.port}"
+        return urlunparse(parsed._replace(netloc=netloc))
+    return url
+
+
+REDIS_URL: str = _build_redis_url()
 
 # ---------------------------------------------------------------------------
 # Path classification

@@ -68,6 +68,13 @@ spec:
               {{- else }}
               value: {{ .Values.externalRedis.url | quote }}
               {{- end }}
+            {{- if .Values.externalRedis.passwordSecret }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalRedis.passwordSecret }}
+                  key: {{ .Values.externalRedis.passwordSecretKey | default "password" }}
+            {{- end }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

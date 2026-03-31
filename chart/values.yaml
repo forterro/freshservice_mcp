@@ -31,9 +31,13 @@ externalRedis:
   # Redis connection URL (e.g. redis://:password@host:6379/0)
   # Set directly or via existingSecret.
   url: ""
-  # Use an existing Secret containing the Redis URL.
+  # Use an existing Secret containing the full Redis URL.
   existingSecret: ""
   existingSecretKey: "REDIS_URL"
+  # Use an existing Secret for the Redis password (injected separately).
+  # The password is merged into the URL at runtime.
+  passwordSecret: ""
+  passwordSecretKey: "password"
 
 # -- Sensitive values injected as env vars from a Secret.
 # Set these or use existingSecret.
