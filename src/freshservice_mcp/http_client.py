@@ -22,6 +22,16 @@ def _auth_header() -> str:
     token = forwarded_token_var.get()
     if token:
         return f"Bearer {token}"
+    return _apikey_auth_header()
+
+
+def _apikey_auth_header() -> str:
+    """Return Basic Auth header using the configured API key.
+
+    Always uses the API key regardless of whether an OAuth token is
+    available.  Required for Freshservice endpoints that do not support
+    OAuth (e.g. ``/api/v2/pm/`` Project Management NewGen).
+    """
     return f"Basic {base64.b64encode(f'{FRESHSERVICE_APIKEY}:X'.encode()).decode()}"
 
 
@@ -40,6 +50,27 @@ def get_auth_headers_readonly() -> Dict[str, str]:
     that include Content-Type: application/json.
     """
     return {"Authorization": _auth_header()}
+
+
+def get_apikey_headers() -> Dict[str, str]:
+    """Return API-key auth + JSON content-type headers.
+
+    Forces Basic Auth with the API key, bypassing any per-user OAuth
+    token.  Use for endpoints that do not support OAuth (e.g. PM NewGen).
+    """
+    return {
+        "Authorization": _apikey_auth_header(),
+        "Content-Type": "application/json",
+    }
+
+
+def get_apikey_headers_readonly() -> Dict[str, str]:
+    """Return API-key auth headers only (no Content-Type).
+
+    Forces Basic Auth with the API key, bypassing any per-user OAuth
+    token.  Use for endpoints that do not support OAuth (e.g. PM NewGen).
+    """
+    return {"Authorization": _apikey_auth_header()}
 
 
 def parse_link_header(link_header: str) -> Dict[str, Optional[int]]:
@@ -107,26 +138,28 @@ async def cached_api_get(path: str, params: Optional[Dict[str, Any]] = None,
     return resp
 
 
-async def api_post(path: str, json: Optional[Any] = None) -> httpx.Response:
+async def api_post(path: str, json: Optional[Any] = None,
+                   headers: Optional[Dict[str, str]] = None) -> httpx.Response:
     """Perform an authenticated POST request."""
     root = _path_root(path)
     start = time.monotonic()
     async with trace_span("api.post", {"http.method": "POST", "http.path_root": root}):
         async with httpx.AsyncClient() as client:
-            resp = await client.post(api_url(path), headers=get_auth_headers(), json=json)
+            resp = await client.post(api_url(path), headers=headers or get_auth_headers(), json=json)
     elapsed = time.monotonic() - start
     API_REQUESTS.labels(method="POST", path_root=root, status_code=resp.status_code).inc()
     API_DURATION.labels(method="POST", path_root=root).observe(elapsed)
     return resp
 
 
-async def api_put(path: str, json: Optional[Dict[str, Any]] = None) -> httpx.Response:
+async def api_put(path: str, json: Optional[Dict[str, Any]] = None,
+                  headers: Optional[Dict[str, str]] = None) -> httpx.Response:
     """Perform an authenticated PUT request."""
     root = _path_root(path)
     start = time.monotonic()
     async with trace_span("api.put", {"http.method": "PUT", "http.path_root": root}):
         async with httpx.AsyncClient() as client:
-            resp = await client.put(api_url(path), headers=get_auth_headers(), json=json)
+            resp = await client.put(api_url(path), headers=headers or get_auth_headers(), json=json)
     elapsed = time.monotonic() - start
     API_REQUESTS.labels(method="PUT", path_root=root, status_code=resp.status_code).inc()
     API_DURATION.labels(method="PUT", path_root=root).observe(elapsed)

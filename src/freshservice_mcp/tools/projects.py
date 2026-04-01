@@ -12,17 +12,23 @@ import httpx
 
 from ..http_client import (
     api_delete, cached_api_get as api_get, api_post, api_put,
-    get_auth_headers, handle_error,
+    get_apikey_headers, handle_error,
 )
 
 # Base path for NewGen project management
 _PM = "pm/projects"
 
-# NewGen PM endpoints require Content-Type on ALL verbs (incl. GET/DELETE).
+# NewGen PM endpoints require Content-Type on ALL verbs (incl. GET/DELETE)
+# AND do not support OAuth — they only accept API-key Basic Auth.
 
 def _pm_headers() -> Dict[str, str]:
-    """Return headers with Content-Type for PM endpoints."""
-    return get_auth_headers()
+    """Return API-key headers with Content-Type for PM endpoints.
+
+    Freshservice PM NewGen endpoints (``/api/v2/pm/``) do not support
+    OAuth 2.0 and return 401 when called with a Bearer token.  We force
+    API-key Basic Auth here regardless of the transport.
+    """
+    return get_apikey_headers()
 
 
 def register_project_tools(mcp) -> None:  # noqa: C901
@@ -144,7 +150,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
             if custom_fields:
                 data["custom_fields"] = custom_fields
             try:
-                resp = await api_post(_PM, json=data)
+                resp = await api_post(_PM, json=data, headers=_pm_headers())
                 resp.raise_for_status()
                 return {"success": True, "project": resp.json()}
             except Exception as e:
@@ -167,7 +173,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
             if not data:
                 return {"error": "No fields provided for update"}
             try:
-                resp = await api_put(f"{_PM}/{project_id}", json=data)
+                resp = await api_put(f"{_PM}/{project_id}", json=data, headers=_pm_headers())
                 resp.raise_for_status()
                 return {"success": True, "project": resp.json()}
             except Exception as e:
@@ -191,7 +197,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
             if not project_id:
                 return {"error": "project_id required for archive"}
             try:
-                resp = await api_post(f"{_PM}/{project_id}/archive", json={})
+                resp = await api_post(f"{_PM}/{project_id}/archive", json={}, headers=_pm_headers())
                 if resp.status_code == 200:
                     return {"success": True, "message": "Project archived"}
                 resp.raise_for_status()
@@ -204,7 +210,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
             if not project_id:
                 return {"error": "project_id required for restore"}
             try:
-                resp = await api_post(f"{_PM}/{project_id}/restore", json={})
+                resp = await api_post(f"{_PM}/{project_id}/restore", json={}, headers=_pm_headers())
                 if resp.status_code == 200:
                     return {"success": True, "message": "Project restored"}
                 resp.raise_for_status()
@@ -243,6 +249,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 resp = await api_post(
                     f"{_PM}/{project_id}/members",
                     json={"members": members},
+                    headers=_pm_headers(),
                 )
                 resp.raise_for_status()
                 return {"success": True, "result": resp.json()}
@@ -274,6 +281,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 resp = await api_post(
                     f"{_PM}/{project_id}/{module_name}",
                     json={"ids": ids},
+                    headers=_pm_headers(),
                 )
                 resp.raise_for_status()
                 return {"success": True, "result": resp.json()}
@@ -485,7 +493,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
             if custom_fields:
                 data["custom_fields"] = custom_fields
             try:
-                resp = await api_post(f"{base}/tasks", json=data)
+                resp = await api_post(f"{base}/tasks", json=data, headers=_pm_headers())
                 resp.raise_for_status()
                 return {"success": True, "task": resp.json()}
             except Exception as e:
@@ -513,7 +521,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 return {"error": "No fields provided for update"}
             try:
                 # NOTE: Freshservice uses singular "task" for update URL
-                resp = await api_put(f"{base}/task/{task_id}", json=data)
+                resp = await api_put(f"{base}/task/{task_id}", json=data, headers=_pm_headers())
                 resp.raise_for_status()
                 return {"success": True, "task": resp.json()}
             except Exception as e:
@@ -583,6 +591,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 resp = await api_post(
                     f"{base}/tasks/{task_id}/notes",
                     json={"content": content},
+                    headers=_pm_headers(),
                 )
                 resp.raise_for_status()
                 return {"success": True, "notes": resp.json()}
@@ -610,6 +619,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 resp = await api_put(
                     f"{base}/tasks/{task_id}/notes/{note_id}",
                     json={"content": content},
+                    headers=_pm_headers(),
                 )
                 resp.raise_for_status()
                 return {"success": True, "note": resp.json()}
@@ -643,6 +653,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 resp = await api_post(
                     f"{base}/tasks/{task_id}/{module_name}",
                     json={"ids": ids},
+                    headers=_pm_headers(),
                 )
                 resp.raise_for_status()
                 return {"success": True, "result": resp.json()}
