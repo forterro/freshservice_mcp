@@ -87,15 +87,22 @@ def _is_reference_path(path: str) -> bool:
 
 
 def _user_id() -> str:
-    """Extract a stable user identifier from the forwarded OAuth token.
+    """Extract a stable user identifier from the forwarded auth header.
 
-    Falls back to ``"apikey"`` when no per-user token is present (local
-    dev / API-key mode).
+    For Bearer tokens (OAuth), extracts user info from the JWT payload.
+    For Basic auth (API key), hashes the credentials for uniqueness.
+    Falls back to ``"apikey"`` when no auth is forwarded (local dev).
     """
     import base64
-    token = forwarded_token_var.get()
-    if not token:
+    auth_header = forwarded_token_var.get()
+    if not auth_header:
         return "apikey"
+    auth_lower = auth_header.lower()
+    if auth_lower.startswith("basic "):
+        # Basic auth forwarded from gateway — hash for per-key isolation
+        return "basic_" + hashlib.sha256(auth_header.encode()).hexdigest()[:16]
+    # Bearer token — strip prefix and decode JWT
+    token = auth_header[7:] if auth_lower.startswith("bearer ") else auth_header
     try:
         payload_b64 = token.split(".")[1]
         padding = 4 - len(payload_b64) % 4

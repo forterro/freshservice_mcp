@@ -6,7 +6,7 @@ import time
 import httpx
 from typing import Optional, Dict, Any
 
-from .auth import forwarded_token_var
+from .auth import forwarded_auth_var
 from .cache import cache_get, cache_set
 from .config import FRESHSERVICE_DOMAIN, FRESHSERVICE_APIKEY
 from .telemetry import API_REQUESTS, API_DURATION, _path_root, trace_span
@@ -15,13 +15,13 @@ from .telemetry import API_REQUESTS, API_DURATION, _path_root, trace_span
 def _auth_header() -> str:
     """Return the Authorization header value.
 
-    Uses the per-user Bearer token forwarded by the MCP gateway when
-    available (HTTP transports behind ContextForge).  Falls back to
-    Basic Auth with the API key (stdio / local dev).
+    Uses the forwarded credentials from the MCP gateway when available
+    (Bearer for OAuth, Basic for API key).  Falls back to Basic Auth
+    with the env-var API key (stdio / local dev).
     """
-    token = forwarded_token_var.get()
-    if token:
-        return f"Bearer {token}"
+    forwarded = forwarded_auth_var.get()
+    if forwarded:
+        return forwarded
     return f"Basic {base64.b64encode(f'{FRESHSERVICE_APIKEY}:X'.encode()).decode()}"
 
 
