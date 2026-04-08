@@ -103,5 +103,3 @@ def register_misc_tools(mcp) -> None:
                 return handle_error(e, "get workspace")
 
         return {"error": f"Unknown action '{action}'. Valid: list, get"}
-
-
