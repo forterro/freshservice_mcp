@@ -38,56 +38,153 @@ User → MCP Gateway (OAuth2 flow) → freshservice-mcp (Bearer token forwarding
 
 ### Creating a Freshservice OAuth2 Application
 
-Before configuring the gateway, you must register an OAuth2 application in Freshservice.
+Before configuring the gateway, you must register OAuth2 credentials in the
+**Freshworks Developer Portal** (not in the Freshservice admin panel).
 
-#### Step 1 — Register the Application
+#### Step 1 — Discover the OAuth2 Endpoints
 
-1. Log in to Freshservice as an administrator
-2. Navigate to **Admin → Security → OAuth Applications** (or go to `https://yourcompany.freshservice.com/admin/oauth_applications`)
-3. Click **New Application**
-4. Fill in:
-   - **Application Name**: a descriptive name (e.g. `MCP Gateway - ContextForge`)
-   - **Description**: optional
-   - **Redirect URI**: the OAuth2 callback URL of your MCP gateway (e.g. `https://contextforge.dev.c1p.frtapps.com/oauth/callback/freshservice`)
-5. Click **Save**
-6. Copy the **Client ID** and **Client Secret** — you will need them for the gateway configuration
+Freshservice exposes a standard OAuth Authorization Server metadata endpoint.
+Query it to get the correct URLs for your account:
 
-#### Step 2 — Note the OAuth2 Endpoints
+```bash
+curl -s https://YOUR-DOMAIN.freshservice.com/.well-known/oauth-authorization-server | python3 -m json.tool
+```
 
-Freshservice OAuth2 endpoints follow this pattern:
+This returns a JSON document like:
 
-| Endpoint | URL |
-|----------|-----|
-| Authorization | `https://yourcompany.freshservice.com/authorize` |
-| Token | `https://yourcompany.freshservice.com/api/v2/oauth/token` |
+```json
+{
+  "issuer": "https://YOUR-ORG.myfreshworks.com",
+  "authorization_endpoint": "https://YOUR-ORG.myfreshworks.com/org/oauth/v2/authorize",
+  "token_endpoint": "https://YOUR-ORG.myfreshworks.com/org/oauth/v2/token",
+  "registration_endpoint": "https://YOUR-ORG.myfreshworks.com/developer/oauth/product/.../register",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "token_endpoint_auth_methods_supported": ["none", "client_secret_basic"],
+  "code_challenge_methods_supported": ["plain", "S256"],
+  "scopes_supported": [
+    "freshservice.tickets.create",
+    "freshservice.tickets.view",
+    "freshservice.assets.view",
+    "freshservice.assets.manage",
+    "..."
+  ]
+}
+```
 
-> **Important**: The token endpoint uses `client_secret_basic` authentication method (credentials in the `Authorization` header, not in the POST body). Make sure your gateway is configured accordingly.
+> **Critical**: The endpoints are on the **Freshworks organization domain**
+> (`YOUR-ORG.myfreshworks.com`), NOT on the Freshservice product domain
+> (`YOUR-DOMAIN.freshservice.com`). The product domain only serves the
+> `.well-known` metadata and the legacy `/api/v2/oauth/token` endpoint.
+
+Key takeaways from the metadata:
+
+| Field | Value |
+|-------|-------|
+| Authorization endpoint | `https://YOUR-ORG.myfreshworks.com/org/oauth/v2/authorize` |
+| Token endpoint | `https://YOUR-ORG.myfreshworks.com/org/oauth/v2/token` |
+| Auth method | `client_secret_basic` (credentials in Authorization header) |
+| PKCE | Supported (`S256` and `plain`) |
+| Scopes | Granular per-resource (see `scopes_supported`) |
+
+#### Step 2 — Register OAuth2 Credentials
+
+1. Go to the [Freshworks Developer Portal](https://developers.freshworks.com/login/)
+2. Enter your **organization URL** (e.g. `YOUR-ORG.myfreshworks.com`) and click **Proceed**
+3. Click the **Settings** icon (gear) in the top navigation bar
+4. In the **OAuth Credentials** section, click **Create OAuth Credentials**
+5. Fill in:
+   - **Name**: a descriptive name (e.g. `ContextForge MCP Gateway`)
+   - **Description**: brief description of the integration
+   - **Redirect URL**: the OAuth2 callback URL of your MCP gateway
+     (e.g. `https://your-contextforge.example.com/oauth/callback`)
+   - **Add scopes**: select the Freshservice resources and permissions your
+     integration needs (e.g. `freshservice.tickets.view`,
+     `freshservice.assets.view`, etc.)
+6. Click **Create Credentials**
+7. Copy the **Client ID** (format: `fw_ext_...`) and **Client Secret**
+
+> **Important — scope limitations:**
+>
+> The Freshworks Developer Portal has an **undocumented limit on the number
+> of scopes** that can be associated with a single OAuth credential. If you
+> select too many scopes, the portal silently fails with:
+>
+> > *"An error occurred when updating OAuth credential, please retry later"*
+>
+> This is a Freshworks platform bug, not a ContextForge issue. Workarounds:
+>
+> - **Add scopes incrementally** — save after adding a few at a time
+> - **Prioritize essential scopes** — tickets, assets, changes, problems,
+>   agents, solutions cover 90% of use cases
+> - Some Freshservice API endpoints (releases, canned responses,
+>   maintenance windows, workspaces, change approvals) may not have
+>   corresponding OAuth scopes available at all and will return 403
+>   regardless of configuration
+
+> **Important — common mistakes to avoid:**
+>
+> - Do **NOT** create the app in the Freshservice admin panel
+>   (`Admin → Security`) — that section does not have OAuth Applications.
+> - Do **NOT** use the Freshworks Developer Portal "Apps" section
+>   (Freshworks/Custom/External apps) — those are for marketplace apps built
+>   with the FDK, not for external OAuth integrations.
+> - The OAuth credentials are created under your **profile settings** in
+>   the Developer Portal only.
 
 #### Step 3 — Configure the MCP Gateway
 
-Configure your MCP gateway with the OAuth2 credentials. Example for ContextForge:
+Configure your MCP gateway with the OAuth2 credentials. The authorization and
+token URLs come from the `.well-known` metadata discovered in Step 1.
 
-```yaml
-# Gateway configuration for Freshservice OAuth2
-oauth:
-  authorization_url: https://yourcompany.freshservice.com/authorize
-  token_url: https://yourcompany.freshservice.com/api/v2/oauth/token
-  client_id: "<from step 1>"
-  client_secret: "<from step 1>"
-  token_endpoint_auth_method: client_secret_basic
-  scopes: []  # Freshservice does not use granular OAuth scopes
+Example for ContextForge:
+
+```json
+{
+  "grant_type": "authorization_code",
+  "authorization_url": "https://YOUR-ORG.myfreshworks.com/org/oauth/v2/authorize",
+  "token_url": "https://YOUR-ORG.myfreshworks.com/org/oauth/v2/token",
+  "redirect_uri": "https://your-contextforge.example.com/oauth/callback",
+  "client_id": "fw_ext_...",
+  "client_secret": "...",
+  "token_endpoint_auth_method": "client_secret_basic",
+  "scopes": [],
+  "omit_resource": true
+}
 ```
+
+> **Gateway-specific flags:**
+>
+> - `omit_resource: true` — Freshworks does not support the RFC 8707
+>   `resource` parameter. If your gateway sends it, Freshworks will reject
+>   the request with `invalid_id`.
+> - `token_endpoint_auth_method: client_secret_basic` — must match the
+>   `token_endpoint_auth_methods_supported` from the metadata. Using
+>   `client_secret_post` may crash the HTTP/2 stream on Freshworks.
 
 #### Step 4 — Verify
 
 Use the `get_me` tool to verify authentication is working:
 
-```
+```text
 Tool: get_me
 → Returns: { "agent": { "email": "you@company.com", ... }, "source": "oauth_jwt" }
 ```
 
 If the source is `oauth_jwt`, per-user OAuth2 is active.
+
+### Troubleshooting OAuth2
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `invalid_client` / `client does not exist` | Wrong authorize/token URL | Use the URLs from `.well-known/oauth-authorization-server` — they are on `YOUR-ORG.myfreshworks.com/org/oauth/v2/...`, NOT `/oauth/authorize` |
+| `invalid_id` / `invalid identifier value` | Gateway sends unsupported params (`resource`, `code_challenge` with wrong config) | Set `omit_resource: true`; verify PKCE is using S256 if enabled |
+| HTTP/2 stream crash on token exchange | Using `client_secret_post` | Switch to `client_secret_basic` |
+| 404 on `/authorize` or `/oauth/authorize` | Wrong URL path | The correct path is `/org/oauth/v2/authorize` |
+| Freshworks login page shows "page not found" | Wrong authorize URL variant | Use exactly the URL from `.well-known` metadata |
+| Token endpoint returns empty body | Wrong `Content-Type` | Token endpoint expects `application/json`, not `application/x-www-form-urlencoded` |
+| 403 on some API endpoints (releases, canned responses, etc.) | OAuth scope not available or not selected | Some endpoints have no OAuth scope; add scopes incrementally to avoid the portal bug |
+| "An error occurred when updating OAuth credential" in Developer Portal | Too many scopes selected at once | Add scopes in smaller batches and save between each batch |
 
 ### OAuth2 JWT Token Structure
 
