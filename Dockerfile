@@ -32,8 +32,8 @@ COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 
-# Default: SSE transport on port 8000 (override via MCP_TRANSPORT, MCP_PORT)
-ENV MCP_TRANSPORT=sse \
+# Default: streamable-http transport on port 8000 (override via MCP_TRANSPORT, MCP_PORT)
+ENV MCP_TRANSPORT=streamable-http \
     MCP_HOST=0.0.0.0 \
     MCP_PORT=8000
 
