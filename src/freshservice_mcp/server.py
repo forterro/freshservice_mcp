@@ -182,12 +182,26 @@ def main() -> None:
         from starlette.applications import Starlette
         from starlette.routing import Mount
 
+        # For streamable-http, the session manager must be started via its
+        # run() async context manager.  Wire it into Starlette's lifespan.
+        import contextlib
+        from collections.abc import AsyncIterator
+
+        @contextlib.asynccontextmanager
+        async def lifespan(app: Starlette) -> AsyncIterator[None]:
+            if transport == "streamable-http" and mcp._session_manager is not None:
+                async with mcp._session_manager.run():
+                    yield
+            else:
+                yield
+
         health_app = Starlette(
             routes=[
                 Route("/healthz", healthz),
                 Route("/metrics", metrics),
                 Mount("/", app=starlette_app),
             ],
+            lifespan=lifespan,
         )
 
         health_app = ForwardedAuthMiddleware(health_app)
