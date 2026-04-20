@@ -120,9 +120,33 @@ def main() -> None:
     # so that no server-side session state is kept in memory.  This makes
     # horizontal scaling (multiple replicas) work without sticky sessions.
     global mcp
+
+    # Build transport security settings: the MCP SDK (>=1.8) validates
+    # Host and Origin headers to prevent DNS-rebinding attacks.  In K8s
+    # behind a reverse proxy the Host is the external FQDN, so we must
+    # allowlist it.  When MCP_ALLOWED_HOSTS is unset we disable the
+    # protection entirely (safe when Traefik is the only entry-point).
+    from mcp.server.fastmcp.server import TransportSecuritySettings
+
+    allowed_hosts_env = os.getenv("MCP_ALLOWED_HOSTS", "").strip()
+    if allowed_hosts_env:
+        allowed_hosts = [h.strip() for h in allowed_hosts_env.split(",")]
+        allowed_origins = [f"https://{h}" for h in allowed_hosts] + [f"http://{h}" for h in allowed_hosts]
+        security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
+        )
+    else:
+        # Behind a reverse proxy — disable host validation
+        security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=False,
+        )
+
     mcp = FastMCP(
         "freshservice_mcp",
         stateless_http=(transport == "streamable-http"),
+        transport_security=security,
     )
 
     # Always register discovery tools (2 lightweight tools)
