@@ -512,7 +512,9 @@ def register_project_tools(mcp) -> None:  # noqa: C901
             if not data:
                 return {"error": "No fields provided for update"}
             try:
-                resp = await api_put(f"{base}/tasks/{task_id}", json=data)
+                # Freshservice NewGen project-task update uses a singular
+                # endpoint path in the official API: /pm/projects/{id}/task/{id}
+                resp = await api_put(f"{base}/task/{task_id}", json=data)
                 resp.raise_for_status()
                 return {"success": True, "task": resp.json()}
             except Exception as e:
