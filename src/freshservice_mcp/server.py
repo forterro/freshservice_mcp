@@ -40,7 +40,9 @@ VALID_TRANSPORTS = ("stdio", "sse", "streamable-http")
 
 
 # ── MCP instance ───────────────────────────────────────────────────────────
-mcp = FastMCP("freshservice_mcp")
+# Lazily created in main() so we can pass stateless_http=True when using
+# streamable-http transport (enables true stateless HA with multiple replicas).
+mcp: FastMCP | None = None
 
 
 # ── scope resolution ──────────────────────────────────────────────────────
@@ -113,6 +115,15 @@ def main() -> None:
     args, _unknown = parser.parse_known_args()
     scopes = _resolve_scopes(args.scope)
     transport = _resolve_transport(args.transport)
+
+    # Create MCP instance — enable stateless mode for streamable-http
+    # so that no server-side session state is kept in memory.  This makes
+    # horizontal scaling (multiple replicas) work without sticky sessions.
+    global mcp
+    mcp = FastMCP(
+        "freshservice_mcp",
+        stateless_http=(transport == "streamable-http"),
+    )
 
     # Always register discovery tools (2 lightweight tools)
     register_discovery_tools(mcp)

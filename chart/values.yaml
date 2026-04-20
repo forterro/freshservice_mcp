@@ -10,7 +10,7 @@ fullnameOverride: ""
 
 # -- Freshservice MCP server configuration (non-sensitive)
 config:
-  MCP_TRANSPORT: sse
+  MCP_TRANSPORT: streamable-http
   MCP_HOST: "0.0.0.0"
   MCP_PORT: "8000"
   FRESHSERVICE_DOMAIN: ""
@@ -69,6 +69,12 @@ extraEnvFrom: []
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# -- PodDisruptionBudget (recommended when replicaCount > 1)
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
 
 podAnnotations: {}
 podLabels: {}
