@@ -78,7 +78,7 @@ def _resolve_transport(cli_transport: str | None) -> str:
 
 
 # ── main ───────────────────────────────────────────────────────────────────
-def main() -> None:
+def main() -> None:  # pragma: no cover
     parser = argparse.ArgumentParser(
         description="Freshservice MCP Server",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -181,7 +181,7 @@ def main() -> None:
         _run_http(mcp, args, transport)
 
 
-def _run_http(mcp, args, transport) -> None:
+def _run_http(mcp, args, transport) -> None:  # pragma: no cover
     """Start the MCP server with HTTP transport (sse or streamable-http)."""
     host = args.host or os.getenv("MCP_HOST", "0.0.0.0")
     port = args.port or int(os.getenv("MCP_PORT", "8000"))
@@ -243,5 +243,5 @@ def _run_http(mcp, args, transport) -> None:
     anyio.run(server.serve)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
