@@ -178,70 +178,69 @@ def main() -> None:
     if transport == "stdio":
         mcp.run(transport="stdio")
     else:
-        host = args.host or os.getenv("MCP_HOST", "0.0.0.0")
-        port = args.port or int(os.getenv("MCP_PORT", "8000"))
-        log.info("Listening on %s:%d (%s)", host, port, transport)
+        _run_http(mcp, args, transport)
 
-        # Build the Starlette app and wrap it with ForwardedAuthMiddleware
-        # so that per-user Bearer tokens from the gateway are available
-        # to http_client.py via contextvars.
-        if transport == "sse":
-            starlette_app = mcp.sse_app()
-        else:
-            starlette_app = mcp.streamable_http_app()
 
-        # Add a lightweight health endpoint for K8s probes
-        from starlette.responses import PlainTextResponse, Response
-        from starlette.routing import Route
+def _run_http(mcp, args, transport) -> None:
+    """Start the MCP server with HTTP transport (sse or streamable-http)."""
+    host = args.host or os.getenv("MCP_HOST", "0.0.0.0")
+    port = args.port or int(os.getenv("MCP_PORT", "8000"))
+    log.info("Listening on %s:%d (%s)", host, port, transport)
 
-        async def healthz(request):
-            return PlainTextResponse("ok")
+    if transport == "sse":
+        starlette_app = mcp.sse_app()
+    else:
+        starlette_app = mcp.streamable_http_app()
 
-        async def metrics(request):
-            return Response(
-                content=metrics_response(),
-                media_type="text/plain; version=0.0.4; charset=utf-8",
-            )
+    from starlette.responses import PlainTextResponse, Response
+    from starlette.routing import Route
 
-        from starlette.applications import Starlette
-        from starlette.routing import Mount
+    def healthz(request):
+        return PlainTextResponse("ok")
 
-        # For streamable-http, the session manager must be started via its
-        # run() async context manager.  Wire it into Starlette's lifespan.
-        import contextlib
-        from collections.abc import AsyncIterator
+    def metrics(request):
+        return Response(
+            content=metrics_response(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
 
-        @contextlib.asynccontextmanager
-        async def lifespan(app: Starlette) -> AsyncIterator[None]:
-            if transport == "streamable-http" and mcp._session_manager is not None:
-                async with mcp._session_manager.run():
-                    yield
-            else:
+    from starlette.applications import Starlette
+    from starlette.routing import Mount
+
+    import contextlib
+    from collections.abc import AsyncIterator
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app: Starlette) -> AsyncIterator[None]:
+        if transport == "streamable-http" and mcp._session_manager is not None:
+            async with mcp._session_manager.run():
                 yield
+        else:
+            yield
 
-        health_app = Starlette(
-            routes=[
-                Route("/healthz", healthz),
-                Route("/metrics", metrics),
-                Mount("/", app=starlette_app),
-            ],
-            lifespan=lifespan,
-        )
+    health_app = Starlette(
+        routes=[
+            Route("/healthz", healthz),
+            Route("/metrics", metrics),
+            Mount("/", app=starlette_app),
+        ],
+        lifespan=lifespan,
+    )
 
-        health_app = ForwardedAuthMiddleware(health_app)
+    health_app = ForwardedAuthMiddleware(health_app)
 
-        mcp.settings.host = host
-        mcp.settings.port = port
+    mcp.settings.host = host
+    mcp.settings.port = port
 
-        import uvicorn
-        config = uvicorn.Config(
-            health_app,
-            host=host,
-            port=port,
-            log_level=mcp.settings.log_level.lower(),
-        )
-        server = uvicorn.Server(config)
-        anyio.run(server.serve)
+    import uvicorn
+    config = uvicorn.Config(
+        health_app,
+        host=host,
+        port=port,
+        log_level=mcp.settings.log_level.lower(),
+    )
+    server = uvicorn.Server(config)
+    anyio.run(server.serve)
 
 
 if __name__ == "__main__":

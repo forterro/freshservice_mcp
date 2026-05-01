@@ -143,7 +143,7 @@ def _ttl_for(path: str) -> int:
 _redis_client = None  # lazily initialised
 
 
-async def _get_redis():
+def _get_redis():
     """Return a shared ``redis.asyncio.Redis`` client (lazy init)."""
     global _redis_client
     if _redis_client is None:
@@ -158,7 +158,7 @@ async def _get_redis():
 
 async def _redis_get(key: str) -> Optional[str]:
     try:
-        client = await _get_redis()
+        client = _get_redis()
         val = await client.get(key)
         REDIS_CONNECTED.set(1)
         return val
@@ -171,7 +171,7 @@ async def _redis_get(key: str) -> Optional[str]:
 
 async def _redis_set(key: str, value: str, ttl: int) -> None:
     try:
-        client = await _get_redis()
+        client = _get_redis()
         await client.set(key, value, ex=ttl)
         REDIS_CONNECTED.set(1)
     except Exception as exc:
@@ -237,6 +237,33 @@ async def cache_set(path: str, body: str, params: Optional[dict] = None) -> None
     CACHE_OPS.labels(operation="set", tier=tier).inc()
 
 
+async def _redis_invalidate(path: Optional[str]) -> int:
+    """Invalidate Redis cache entries."""
+    try:
+        client = _get_redis()
+        if path is None:
+            keys = []
+            async for key in client.scan_iter(match="fs:*", count=500):
+                keys.append(key)
+            if keys:
+                return await client.delete(*keys)
+            return 0
+        return await client.delete(_cache_key(path))
+    except Exception as exc:
+        log.warning("Redis invalidate failed: %s", exc)
+        return 0
+
+
+def _mem_invalidate(path: Optional[str]) -> int:
+    """Invalidate in-memory cache entries."""
+    if path is None:
+        count = len(_mem_cache)
+        _mem_cache.clear()
+        return count
+    key = _cache_key(path)
+    return 1 if _mem_cache.pop(key, None) is not None else 0
+
+
 async def cache_invalidate(path: Optional[str] = None) -> int:
     """Invalidate cache entries.
 
@@ -245,24 +272,5 @@ async def cache_invalidate(path: Optional[str] = None) -> int:
     Returns the number of keys removed.
     """
     if REDIS_URL:
-        try:
-            client = await _get_redis()
-            if path is None:
-                keys = []
-                async for key in client.scan_iter(match="fs:*", count=500):
-                    keys.append(key)
-                if keys:
-                    return await client.delete(*keys)
-                return 0
-            else:
-                return await client.delete(_cache_key(path))
-        except Exception as exc:
-            log.warning("Redis invalidate failed: %s", exc)
-            return 0
-    else:
-        if path is None:
-            count = len(_mem_cache)
-            _mem_cache.clear()
-            return count
-        key = _cache_key(path)
-        return 1 if _mem_cache.pop(key, None) is not None else 0
+        return await _redis_invalidate(path)
+    return _mem_invalidate(path)

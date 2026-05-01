@@ -11,6 +11,9 @@ from .cache import cache_get, cache_set
 from .config import FRESHSERVICE_DOMAIN, FRESHSERVICE_APIKEY
 from .telemetry import API_REQUESTS, API_DURATION, _path_root, trace_span
 
+_ATTR_METHOD = "http.method"
+_ATTR_PATH_ROOT = "http.path_root"
+
 
 def _auth_header() -> str:
     """Return the Authorization header value.
@@ -72,7 +75,7 @@ async def api_get(path: str, params: Optional[Dict[str, Any]] = None,
     """
     root = _path_root(path)
     start = time.monotonic()
-    async with trace_span("api.get", {"http.method": "GET", "http.path_root": root}):
+    async with trace_span("api.get", {_ATTR_METHOD: "GET", _ATTR_PATH_ROOT: root}):
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 api_url(path),
@@ -111,7 +114,7 @@ async def api_post(path: str, json: Optional[Any] = None) -> httpx.Response:
     """Perform an authenticated POST request."""
     root = _path_root(path)
     start = time.monotonic()
-    async with trace_span("api.post", {"http.method": "POST", "http.path_root": root}):
+    async with trace_span("api.post", {_ATTR_METHOD: "POST", _ATTR_PATH_ROOT: root}):
         async with httpx.AsyncClient() as client:
             resp = await client.post(api_url(path), headers=get_auth_headers(), json=json)
     elapsed = time.monotonic() - start
@@ -124,7 +127,7 @@ async def api_put(path: str, json: Optional[Dict[str, Any]] = None) -> httpx.Res
     """Perform an authenticated PUT request."""
     root = _path_root(path)
     start = time.monotonic()
-    async with trace_span("api.put", {"http.method": "PUT", "http.path_root": root}):
+    async with trace_span("api.put", {_ATTR_METHOD: "PUT", _ATTR_PATH_ROOT: root}):
         async with httpx.AsyncClient() as client:
             resp = await client.put(api_url(path), headers=get_auth_headers(), json=json)
     elapsed = time.monotonic() - start
@@ -138,7 +141,7 @@ async def api_delete(path: str,
     """Perform an authenticated DELETE request."""
     root = _path_root(path)
     start = time.monotonic()
-    async with trace_span("api.delete", {"http.method": "DELETE", "http.path_root": root}):
+    async with trace_span("api.delete", {_ATTR_METHOD: "DELETE", _ATTR_PATH_ROOT: root}):
         async with httpx.AsyncClient() as client:
             resp = await client.delete(
                 api_url(path),

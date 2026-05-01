@@ -18,6 +18,9 @@ from ..http_client import (
 # Base path for NewGen project management
 _PM = "pm/projects"
 
+# Error message constants (S1192)
+_ERR_MODULE_NAME = "module_name required — one of: tickets, problems, changes, assets"
+
 # NewGen PM endpoints require Content-Type on ALL verbs (incl. GET/DELETE).
 
 def _pm_headers() -> Dict[str, str]:
@@ -266,7 +269,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 return {"error": "project_id required for create_association"}
             if not module_name or module_name not in ("tickets", "problems", "changes", "assets"):
                 return {
-                    "error": "module_name required — one of: tickets, problems, changes, assets"
+                    "error": _ERR_MODULE_NAME
                 }
             if not ids:
                 return {"error": "ids required — list of entity IDs to associate"}
@@ -286,7 +289,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 return {"error": "project_id required for get_associations"}
             if not module_name or module_name not in ("tickets", "problems", "changes", "assets"):
                 return {
-                    "error": "module_name required — one of: tickets, problems, changes, assets"
+                    "error": _ERR_MODULE_NAME
                 }
             try:
                 resp = await api_get(f"{_PM}/{project_id}/{module_name}", headers=_pm_headers())
@@ -301,7 +304,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 return {"error": "project_id required for delete_association"}
             if not module_name or module_name not in ("tickets", "problems", "changes", "assets"):
                 return {
-                    "error": "module_name required — one of: tickets, problems, changes, assets"
+                    "error": _ERR_MODULE_NAME
                 }
             if not association_id:
                 return {"error": "association_id required — the ID of the entity to dissociate"}
@@ -634,7 +637,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 return {"error": "task_id required for create_association"}
             if not module_name or module_name not in ("tickets", "problems", "changes", "assets"):
                 return {
-                    "error": "module_name required — one of: tickets, problems, changes, assets"
+                    "error": _ERR_MODULE_NAME
                 }
             if not ids:
                 return {"error": "ids required — list of entity IDs to associate"}
@@ -654,7 +657,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 return {"error": "task_id required for get_associations"}
             if not module_name or module_name not in ("tickets", "problems", "changes", "assets"):
                 return {
-                    "error": "module_name required — one of: tickets, problems, changes, assets"
+                    "error": _ERR_MODULE_NAME
                 }
             try:
                 resp = await api_get(f"{base}/tasks/{task_id}/{module_name}", headers=_pm_headers())
@@ -669,7 +672,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
                 return {"error": "task_id required for delete_association"}
             if not module_name or module_name not in ("tickets", "problems", "changes", "assets"):
                 return {
-                    "error": "module_name required — one of: tickets, problems, changes, assets"
+                    "error": _ERR_MODULE_NAME
                 }
             if not association_id:
                 return {"error": "association_id required — the entity ID to dissociate"}

@@ -154,7 +154,7 @@ def instrument_tool(func: Callable) -> Callable:
                         span.set_attribute("error", True)
                         span.set_attribute("error.message", str(result["error"])[:200])
                 return result
-        except Exception as exc:
+        except Exception:
             status = "error"
             raise
         finally:

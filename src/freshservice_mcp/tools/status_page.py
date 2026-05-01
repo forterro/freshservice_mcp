@@ -39,6 +39,11 @@ import httpx
 
 from ..http_client import api_delete, cached_api_get as api_get, api_post, api_put, handle_error
 
+# Error message constants (S1192)
+_ERR_MAINT_IDS = "change_id (or maintenance_window_id) and maintenance_id required"
+_ERR_INCIDENT_IDS = "ticket_id and incident_id required"
+_ERR_SUBSCRIBER_ID = "subscriber_id required"
+
 # Module-level caches for auto-discovered IDs
 _cached_workspace_id: Optional[int] = None
 _cached_status_page_id: Optional[int] = None
@@ -62,7 +67,7 @@ async def _resolve_workspace_id() -> Optional[int]:
     return None
 
 
-async def _resolve_status_page_id(explicit_id: Optional[int]) -> Optional[int]:
+async def _resolve_status_page_id(explicit_id: Optional[int] = None) -> Optional[int]:
     """Return the status_page_id to use (auto-discovers if not given)."""
     global _cached_status_page_id
     if explicit_id:
@@ -305,7 +310,7 @@ def register_status_page_tools(mcp) -> None:
         if action == "get_maintenance":
             prefix = _maint_prefix(change_id, maintenance_window_id)
             if not prefix or not maintenance_id:
-                return {"error": "change_id (or maintenance_window_id) and maintenance_id required"}
+                return {"error": _ERR_MAINT_IDS}
             try:
                 resp = await api_get(
                     f"{prefix}/status/pages/{sp}/maintenances/{maintenance_id}"
@@ -318,7 +323,7 @@ def register_status_page_tools(mcp) -> None:
         if action == "update_maintenance":
             prefix = _maint_prefix(change_id, maintenance_window_id)
             if not prefix or not maintenance_id:
-                return {"error": "change_id (or maintenance_window_id) and maintenance_id required"}
+                return {"error": _ERR_MAINT_IDS}
             data = {}
             for k, v in [("title", title), ("description", description),
                          ("started_at", started_at), ("ended_at", ended_at),
@@ -339,7 +344,7 @@ def register_status_page_tools(mcp) -> None:
         if action == "delete_maintenance":
             prefix = _maint_prefix(change_id, maintenance_window_id)
             if not prefix or not maintenance_id:
-                return {"error": "change_id (or maintenance_window_id) and maintenance_id required"}
+                return {"error": _ERR_MAINT_IDS}
             try:
                 resp = await api_delete(
                     f"{prefix}/status/pages/{sp}/maintenances/{maintenance_id}"
@@ -356,7 +361,7 @@ def register_status_page_tools(mcp) -> None:
         if action == "list_maintenance_updates":
             prefix = _maint_prefix(change_id, maintenance_window_id)
             if not prefix or not maintenance_id:
-                return {"error": "change_id (or maintenance_window_id) and maintenance_id required"}
+                return {"error": _ERR_MAINT_IDS}
             try:
                 resp = await api_get(
                     f"{prefix}/status/pages/{sp}/maintenances/{maintenance_id}/updates"
@@ -464,7 +469,7 @@ def register_status_page_tools(mcp) -> None:
 
         if action == "get_incident":
             if not ticket_id or not incident_id:
-                return {"error": "ticket_id and incident_id required"}
+                return {"error": _ERR_INCIDENT_IDS}
             try:
                 resp = await api_get(
                     f"tickets/{ticket_id}/status/pages/{sp}/incidents/{incident_id}"
@@ -476,7 +481,7 @@ def register_status_page_tools(mcp) -> None:
 
         if action == "update_incident":
             if not ticket_id or not incident_id:
-                return {"error": "ticket_id and incident_id required"}
+                return {"error": _ERR_INCIDENT_IDS}
             data = {}
             for k, v in [("title", title), ("description", description),
                          ("started_at", started_at)]:
@@ -496,7 +501,7 @@ def register_status_page_tools(mcp) -> None:
 
         if action == "delete_incident":
             if not ticket_id or not incident_id:
-                return {"error": "ticket_id and incident_id required"}
+                return {"error": _ERR_INCIDENT_IDS}
             try:
                 resp = await api_delete(
                     f"tickets/{ticket_id}/status/pages/{sp}/incidents/{incident_id}"
@@ -512,7 +517,7 @@ def register_status_page_tools(mcp) -> None:
         # URL: tickets/{tid}/status/pages/{sp}/incidents/{iid}/updates[/{uid}]
         if action == "list_incident_updates":
             if not ticket_id or not incident_id:
-                return {"error": "ticket_id and incident_id required"}
+                return {"error": _ERR_INCIDENT_IDS}
             try:
                 resp = await api_get(
                     f"tickets/{ticket_id}/status/pages/{sp}/incidents/{incident_id}/updates"
@@ -595,7 +600,7 @@ def register_status_page_tools(mcp) -> None:
 
         if action == "get_subscriber":
             if not subscriber_id:
-                return {"error": "subscriber_id required"}
+                return {"error": _ERR_SUBSCRIBER_ID}
             try:
                 resp = await api_get(f"status/pages/{sp}/subscribers/{subscriber_id}")
                 resp.raise_for_status()
@@ -624,7 +629,7 @@ def register_status_page_tools(mcp) -> None:
 
         if action == "update_subscriber":
             if not subscriber_id:
-                return {"error": "subscriber_id required"}
+                return {"error": _ERR_SUBSCRIBER_ID}
             data = {}
             if service_ids is not None:
                 data["service_ids"] = service_ids
@@ -646,7 +651,7 @@ def register_status_page_tools(mcp) -> None:
 
         if action == "delete_subscriber":
             if not subscriber_id:
-                return {"error": "subscriber_id required"}
+                return {"error": _ERR_SUBSCRIBER_ID}
             try:
                 resp = await api_delete(f"status/pages/{sp}/subscribers/{subscriber_id}")
                 if resp.status_code == 204:

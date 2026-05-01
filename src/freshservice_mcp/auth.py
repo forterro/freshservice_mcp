@@ -50,10 +50,8 @@ class ForwardedAuthMiddleware:
             auth = request.headers.get("authorization", "")
             auth_lower = auth.lower()
             forwarded: str | None = None
-            if auth_lower.startswith("bearer "):
-                forwarded = auth  # full header value: "Bearer <token>"
-            elif auth_lower.startswith("basic "):
-                forwarded = auth  # full header value: "Basic <b64>"
+            if auth_lower.startswith("bearer ") or auth_lower.startswith("basic "):
+                forwarded = auth
             # Count auth mode only for MCP traffic (skip infra endpoints)
             path = request.url.path
             if path not in ("/healthz", "/metrics"):
