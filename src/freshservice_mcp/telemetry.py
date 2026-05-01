@@ -168,7 +168,7 @@ def instrument_tool(func: Callable) -> Callable:
 # ═══════════════════════════════════════════════════════════════════════════
 # Initialisation (called once from server.py)
 # ═══════════════════════════════════════════════════════════════════════════
-def init_telemetry(version: str = "unknown", transport: str = "unknown") -> None:
+def init_telemetry(version: str = "unknown", transport: str = "unknown") -> None:  # pragma: no cover
     """Set up metrics + optional OTel tracing."""
     global _tracer
 

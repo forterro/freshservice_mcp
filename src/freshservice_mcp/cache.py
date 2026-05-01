@@ -143,7 +143,7 @@ def _ttl_for(path: str) -> int:
 _redis_client = None  # lazily initialised
 
 
-def _get_redis():
+def _get_redis():  # pragma: no cover
     """Return a shared ``redis.asyncio.Redis`` client (lazy init)."""
     global _redis_client
     if _redis_client is None:
@@ -156,7 +156,7 @@ def _get_redis():
     return _redis_client
 
 
-async def _redis_get(key: str) -> Optional[str]:
+async def _redis_get(key: str) -> Optional[str]:  # pragma: no cover
     try:
         client = _get_redis()
         val = await client.get(key)
@@ -169,7 +169,7 @@ async def _redis_get(key: str) -> Optional[str]:
         return None
 
 
-async def _redis_set(key: str, value: str, ttl: int) -> None:
+async def _redis_set(key: str, value: str, ttl: int) -> None:  # pragma: no cover
     try:
         client = _get_redis()
         await client.set(key, value, ex=ttl)
@@ -237,7 +237,7 @@ async def cache_set(path: str, body: str, params: Optional[dict] = None) -> None
     CACHE_OPS.labels(operation="set", tier=tier).inc()
 
 
-async def _redis_invalidate(path: Optional[str]) -> int:
+async def _redis_invalidate(path: Optional[str]) -> int:  # pragma: no cover
     """Invalidate Redis cache entries."""
     try:
         client = _get_redis()

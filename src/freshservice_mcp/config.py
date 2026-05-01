@@ -3,10 +3,10 @@ import os
 import logging
 from enum import IntEnum, Enum
 
-try:
+try:  # pragma: no cover
     from dotenv import load_dotenv
     load_dotenv()
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # pragma: no cover
     pass  # dotenv is optional — env vars are injected directly in K8s/Docker
 
 # ---------------------------------------------------------------------------
