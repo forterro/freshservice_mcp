@@ -51,7 +51,7 @@ def parse_link_header(link_header: str) -> Dict[str, Optional[int]]:
     if not link_header:
         return pagination
     for link in link_header.split(","):
-        match = re.search(r'<(.+?)>;\s*rel="(.+?)"', link)
+        match = re.search(r'<([^>]+)>;\s*rel="([^"]+)"', link)
         if match:
             url, rel = match.groups()
             page_match = re.search(r"page=(\d+)", url)

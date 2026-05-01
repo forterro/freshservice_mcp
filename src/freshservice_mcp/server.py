@@ -131,7 +131,7 @@ def main() -> None:
     allowed_hosts_env = os.getenv("MCP_ALLOWED_HOSTS", "").strip()
     if allowed_hosts_env:
         allowed_hosts = [h.strip() for h in allowed_hosts_env.split(",")]
-        allowed_origins = [f"https://{h}" for h in allowed_hosts] + [f"http://{h}" for h in allowed_hosts]
+        allowed_origins = [f"https://{h}" for h in allowed_hosts]  # noqa: S5332 — HTTPS only
         security = TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
             allowed_hosts=allowed_hosts,
