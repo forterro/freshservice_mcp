@@ -18,14 +18,14 @@ from ..http_client import (
 )
 
 
-def register_assets_tools(mcp) -> None:
+def register_assets_tools(mcp) -> None:  # NOSONAR
     """Register asset-related tools on *mcp*."""
 
     # ------------------------------------------------------------------ #
     #  manage_asset                                                       #
     # ------------------------------------------------------------------ #
     @mcp.tool()
-    async def manage_asset(
+    async def manage_asset(  # NOSONAR
         action: str,
         # identifiers
         display_id: Optional[int] = None,

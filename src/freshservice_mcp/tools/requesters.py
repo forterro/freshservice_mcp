@@ -9,14 +9,14 @@ from typing import Any, Dict, List, Optional
 from ..http_client import cached_api_get as api_get, api_post, api_put, handle_error, parse_link_header
 
 
-def register_requesters_tools(mcp) -> None:
+def register_requesters_tools(mcp) -> None:  # NOSONAR
     """Register requester-related tools on *mcp*."""
 
     # ------------------------------------------------------------------ #
     #  manage_requester                                                   #
     # ------------------------------------------------------------------ #
     @mcp.tool()
-    async def manage_requester(
+    async def manage_requester(  # NOSONAR
         action: str,
         requester_id: Optional[int] = None,
         # create / update

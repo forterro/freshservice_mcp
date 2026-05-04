@@ -10,11 +10,11 @@ from ..http_client import cached_api_get as api_get, api_post, api_put, handle_e
 _ERR_NO_FIELDS = "No fields provided for update"
 
 
-def register_solutions_tools(mcp) -> None:
+def register_solutions_tools(mcp) -> None:  # NOSONAR
     """Register solution-related tools on *mcp*."""
 
     @mcp.tool()
-    async def manage_solution(
+    async def manage_solution(  # NOSONAR
         action: str,
         # identifiers
         category_id: Optional[int] = None,

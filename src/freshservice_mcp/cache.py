@@ -137,9 +137,9 @@ def _ttl_for(path: str) -> int:
     return TTL_REFERENCE if _is_reference_path(path) else TTL_OPERATIONAL
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 # Backend: Redis
-# ═══════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 _redis_client = None  # lazily initialised
 
 
@@ -180,9 +180,9 @@ async def _redis_set(key: str, value: str, ttl: int) -> None:  # pragma: no cove
         CACHE_OPS.labels(operation="error", tier="redis").inc()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 # Backend: In-memory (fallback when Redis is not configured)
-# ═══════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 _mem_cache: dict[str, tuple[float, str]] = {}
 _MEM_MAX_ENTRIES = 2048
 
@@ -206,9 +206,9 @@ def _mem_set(key: str, value: str, ttl: int) -> None:
     _mem_cache[key] = (time.time() + ttl, value)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 # Public API
-# ═══════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 async def cache_get(path: str, params: Optional[dict] = None) -> Optional[str]:
     """Return cached response body (JSON string) or None."""
     key = _cache_key(path, params)

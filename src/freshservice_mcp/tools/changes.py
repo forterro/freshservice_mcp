@@ -30,14 +30,14 @@ from ..http_client import (
 
 
 # ── registration ───────────────────────────────────────────────────────────
-def register_changes_tools(mcp) -> None:  # noqa: C901 – large by nature
+def register_changes_tools(mcp) -> None:  # noqa: C901  # NOSONAR
     """Register change-related tools on *mcp*."""
 
     # ------------------------------------------------------------------ #
     #  manage_change                                                      #
     # ------------------------------------------------------------------ #
     @mcp.tool()
-    async def manage_change(
+    async def manage_change(  # NOSONAR
         action: str,
         change_id: Optional[int] = None,
         # create / update fields

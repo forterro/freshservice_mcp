@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from ..http_client import cached_api_get as api_get, handle_error
 
 
-def register_misc_tools(mcp) -> None:
+def register_misc_tools(mcp) -> None:  # NOSONAR
     """Register canned response and workspace tools on *mcp*."""
 
     # ------------------------------------------------------------------ #

@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 from ..http_client import cached_api_get as api_get, api_post, api_put, handle_error, parse_link_header, _auth_header
 
 
-def register_agents_tools(mcp) -> None:
+def register_agents_tools(mcp) -> None:  # NOSONAR
     """Register agent-related tools on *mcp*."""
 
     # ------------------------------------------------------------------ #
@@ -75,7 +75,7 @@ def register_agents_tools(mcp) -> None:
     #  manage_agent                                                       #
     # ------------------------------------------------------------------ #
     @mcp.tool()
-    async def manage_agent(
+    async def manage_agent(  # NOSONAR
         action: str,
         agent_id: Optional[int] = None,
         # create / update

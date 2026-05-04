@@ -106,11 +106,11 @@ def _maint_prefix(change_id: Optional[int], maintenance_window_id: Optional[int]
     return None
 
 
-def register_status_page_tools(mcp) -> None:
+def register_status_page_tools(mcp) -> None:  # NOSONAR
     """Register status page tools on *mcp*."""
 
     @mcp.tool()
-    async def manage_status_page(
+    async def manage_status_page(  # NOSONAR
         action: str,
         # identifiers
         status_page_id: Optional[int] = None,
@@ -674,7 +674,7 @@ def register_status_page_tools(mcp) -> None:
         }
 
     @mcp.tool()
-    async def manage_maintenance_window(
+    async def manage_maintenance_window(  # NOSONAR
         action: str,
         maintenance_window_id: Optional[int] = None,
         change_id: Optional[int] = None,

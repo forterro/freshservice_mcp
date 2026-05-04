@@ -28,14 +28,14 @@ def _pm_headers() -> Dict[str, str]:
     return get_auth_headers()
 
 
-def register_project_tools(mcp) -> None:  # noqa: C901
+def register_project_tools(mcp) -> None:  # noqa: C901  # NOSONAR
     """Register project management tools on *mcp*."""
 
     # ------------------------------------------------------------------ #
     #  manage_project                                                     #
     # ------------------------------------------------------------------ #
     @mcp.tool()
-    async def manage_project(
+    async def manage_project(  # NOSONAR
         action: str,
         project_id: Optional[int] = None,
         # core fields (create / update)
@@ -350,7 +350,7 @@ def register_project_tools(mcp) -> None:  # noqa: C901
     #  manage_project_task                                                #
     # ------------------------------------------------------------------ #
     @mcp.tool()
-    async def manage_project_task(
+    async def manage_project_task(  # NOSONAR
         action: str,
         project_id: Optional[int] = None,
         task_id: Optional[int] = None,

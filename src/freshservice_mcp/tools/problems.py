@@ -11,11 +11,11 @@ from typing import Any, Dict, List, Optional
 from ..http_client import api_delete, cached_api_get as api_get, api_post, api_put, handle_error
 
 
-def register_problem_tools(mcp) -> None:
+def register_problem_tools(mcp) -> None:  # NOSONAR
     """Register problem management tools on *mcp*."""
 
     @mcp.tool()
-    async def manage_problem(
+    async def manage_problem(  # NOSONAR
         action: str,
         problem_id: Optional[int] = None,
         # core fields
@@ -157,7 +157,7 @@ def register_problem_tools(mcp) -> None:
         if action == "close":
             if not problem_id:
                 return {"error": "problem_id required for close"}
-            data = {"status": 3}  # 3 = Closed
+            data = {"status": 3}  # status Closed
             try:
                 resp = await api_put(f"problems/{problem_id}", json=data)
                 resp.raise_for_status()

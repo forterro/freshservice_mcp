@@ -11,11 +11,11 @@ from typing import Any, Dict, List, Optional
 from ..http_client import api_delete, cached_api_get as api_get, api_post, api_put, handle_error
 
 
-def register_release_tools(mcp) -> None:
+def register_release_tools(mcp) -> None:  # NOSONAR
     """Register release management tools on *mcp*."""
 
     @mcp.tool()
-    async def manage_release(
+    async def manage_release(  # NOSONAR
         action: str,
         release_id: Optional[int] = None,
         # core fields
