@@ -143,6 +143,83 @@ class TestManageProblem:
         result = await tool.fn(action="invalid")
         assert "error" in result
 
+    # ── associate_tickets ──
+
+    @pytest.mark.asyncio
+    async def test_associate_tickets(self, tool):
+        with patch(f"{MOD}.api_post", new_callable=AsyncMock) as m:
+            m.return_value = _ok({}, 200)
+            result = await tool.fn(action="associate_tickets", problem_id=1, ticket_ids=[10, 20])
+            assert result.get("success") is True
+            assert result["ticket_ids"] == [10, 20]
+            m.assert_called_once_with("problems/1/tickets", json={"ticket_ids": [10, 20]})
+
+    @pytest.mark.asyncio
+    async def test_associate_tickets_missing_problem_id(self, tool):
+        result = await tool.fn(action="associate_tickets", ticket_ids=[10])
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_associate_tickets_missing_ticket_ids(self, tool):
+        result = await tool.fn(action="associate_tickets", problem_id=1)
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_associate_tickets_error(self, tool):
+        with patch(f"{MOD}.api_post", new_callable=AsyncMock) as m:
+            m.side_effect = Exception("API error")
+            result = await tool.fn(action="associate_tickets", problem_id=1, ticket_ids=[10])
+            assert "error" in result
+
+    # ── dissociate_ticket ──
+
+    @pytest.mark.asyncio
+    async def test_dissociate_ticket(self, tool):
+        with patch(f"{MOD}.api_delete", new_callable=AsyncMock) as m:
+            m.return_value = _no_content()
+            result = await tool.fn(action="dissociate_ticket", problem_id=1, ticket_id=10)
+            assert result.get("success") is True
+            m.assert_called_once_with("problems/1/tickets/10")
+
+    @pytest.mark.asyncio
+    async def test_dissociate_ticket_missing_problem_id(self, tool):
+        result = await tool.fn(action="dissociate_ticket", ticket_id=10)
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_dissociate_ticket_missing_ticket_id(self, tool):
+        result = await tool.fn(action="dissociate_ticket", problem_id=1)
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_dissociate_ticket_error(self, tool):
+        with patch(f"{MOD}.api_delete", new_callable=AsyncMock) as m:
+            m.side_effect = Exception("API error")
+            result = await tool.fn(action="dissociate_ticket", problem_id=1, ticket_id=10)
+            assert "error" in result
+
+    # ── list_tickets ──
+
+    @pytest.mark.asyncio
+    async def test_list_tickets(self, tool):
+        with patch(f"{MOD}.api_get", new_callable=AsyncMock) as m:
+            m.return_value = _ok({"tickets": [{"id": 10}, {"id": 20}]})
+            result = await tool.fn(action="list_tickets", problem_id=1)
+            assert "tickets" in result
+            m.assert_called_once_with("problems/1/tickets")
+
+    @pytest.mark.asyncio
+    async def test_list_tickets_missing_problem_id(self, tool):
+        result = await tool.fn(action="list_tickets")
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_list_tickets_error(self, tool):
+        with patch(f"{MOD}.api_get", new_callable=AsyncMock) as m:
+            m.side_effect = Exception("API error")
+            result = await tool.fn(action="list_tickets", problem_id=1)
+            assert "error" in result
+
 
 class TestManageProblemNote:
     @pytest.fixture
@@ -217,6 +294,16 @@ class TestManageProblemTask:
             assert "task" in result or result.get("success")
 
     @pytest.mark.asyncio
+    async def test_create_with_agent_id(self, tool):
+        with patch(f"{MOD}.api_post", new_callable=AsyncMock) as m:
+            m.return_value = _ok({"task": {"id": 1, "agent_id": 42}}, 201)
+            result = await tool.fn(action="create", problem_id=1, title="Task", agent_id=42, group_id=100)
+            assert result.get("success")
+            payload = m.call_args[1]["json"]
+            assert payload["agent_id"] == 42
+            assert payload["group_id"] == 100
+
+    @pytest.mark.asyncio
     async def test_create_missing(self, tool):
         result = await tool.fn(action="create", problem_id=1)
         assert "error" in result
@@ -227,6 +314,15 @@ class TestManageProblemTask:
             m.return_value = _ok({"task": {"id": 1}})
             result = await tool.fn(action="update", problem_id=1, task_id=1, title="Updated")
             assert "error" not in result
+
+    @pytest.mark.asyncio
+    async def test_update_with_agent_id(self, tool):
+        with patch(f"{MOD}.api_put", new_callable=AsyncMock) as m:
+            m.return_value = _ok({"task": {"id": 1, "agent_id": 55}})
+            result = await tool.fn(action="update", problem_id=1, task_id=1, agent_id=55)
+            assert result.get("success")
+            payload = m.call_args[1]["json"]
+            assert payload["agent_id"] == 55
 
     @pytest.mark.asyncio
     async def test_delete(self, tool):

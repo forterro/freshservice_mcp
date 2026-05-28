@@ -37,6 +37,9 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
         assets: Optional[List[Dict[str, Any]]] = None,
         analysis_fields: Optional[Dict[str, Any]] = None,
         custom_fields: Optional[Dict[str, Any]] = None,
+        # ticket association
+        ticket_ids: Optional[List[int]] = None,
+        ticket_id: Optional[int] = None,
         # filter / pagination
         query: Optional[str] = None,
         page: int = 1,
@@ -46,8 +49,10 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
 
         Args:
             action: One of 'list', 'get', 'create', 'update', 'delete',
-                    'filter', 'close', 'restore', 'get_fields'.
-            problem_id: Problem ID (required for get/update/delete/close/restore).
+                    'filter', 'close', 'restore', 'get_fields',
+                    'associate_tickets', 'dissociate_ticket', 'list_tickets'.
+            problem_id: Problem ID (required for get/update/delete/close/restore
+                        and ticket association actions).
             requester_id: Requester user ID (required for create).
             subject: Problem subject (required for create).
             description: HTML description (required for create).
@@ -63,6 +68,8 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
             assets: List of associated assets [{"display_id": N}].
             analysis_fields: Analysis fields dict (problem_cause, symptom, impact).
             custom_fields: Custom fields dict.
+            ticket_ids: List of ticket IDs to associate (for 'associate_tickets').
+            ticket_id: Single ticket ID (for 'dissociate_ticket').
             query: Filter query for 'filter' action
                    (e.g. "priority:3 AND status:1").
             page/per_page: Pagination.
@@ -196,9 +203,56 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
             except Exception as e:
                 return handle_error(e, "get problem fields")
 
+        if action == "associate_tickets":
+            if not problem_id:
+                return {"error": "problem_id required for associate_tickets"}
+            if not ticket_ids:
+                return {"error": "ticket_ids required for associate_tickets (list of ticket IDs)"}
+            try:
+                resp = await api_post(
+                    f"problems/{problem_id}/tickets",
+                    json={"ticket_ids": ticket_ids},
+                )
+                resp.raise_for_status()
+                return {
+                    "success": True,
+                    "message": f"Associated {len(ticket_ids)} ticket(s) to problem {problem_id}",
+                    "ticket_ids": ticket_ids,
+                }
+            except Exception as e:
+                return handle_error(e, "associate tickets to problem")
+
+        if action == "dissociate_ticket":
+            if not problem_id:
+                return {"error": "problem_id required for dissociate_ticket"}
+            if not ticket_id:
+                return {"error": "ticket_id required for dissociate_ticket"}
+            try:
+                resp = await api_delete(f"problems/{problem_id}/tickets/{ticket_id}")
+                if resp.status_code == 204:
+                    return {
+                        "success": True,
+                        "message": f"Dissociated ticket {ticket_id} from problem {problem_id}",
+                    }
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                return handle_error(e, "dissociate ticket from problem")
+
+        if action == "list_tickets":
+            if not problem_id:
+                return {"error": "problem_id required for list_tickets"}
+            try:
+                resp = await api_get(f"problems/{problem_id}/tickets")
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                return handle_error(e, "list tickets for problem")
+
         return {
             "error": f"Unknown action '{action}'. Valid: list, get, create, update, delete, "
-            "filter, close, restore, get_fields"
+            "filter, close, restore, get_fields, associate_tickets, dissociate_ticket, "
+            "list_tickets"
         }
 
     # ── Problem Notes ──
@@ -281,6 +335,7 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
         problem_id: int,
         task_id: Optional[int] = None,
         # task fields
+        agent_id: Optional[int] = None,
         title: Optional[str] = None,
         description: Optional[str] = None,
         status: Optional[int] = None,
@@ -294,6 +349,7 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
             action: One of 'list', 'get', 'create', 'update', 'delete'.
             problem_id: Problem ID (always required).
             task_id: Task ID (required for get/update/delete).
+            agent_id: Assigned agent ID.
             title: Task title (required for create).
             description: Task description.
             status: 1=Open, 2=In Progress, 3=Completed.
@@ -328,7 +384,7 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
             data: Dict[str, Any] = {"title": title}
             for k, v in [("description", description), ("status", status),
                          ("due_date", due_date), ("notify_before", notify_before),
-                         ("group_id", group_id)]:
+                         ("group_id", group_id), ("agent_id", agent_id)]:
                 if v is not None:
                     data[k] = v
             try:
@@ -344,7 +400,8 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
             data = {}
             for k, v in [("title", title), ("description", description),
                          ("status", status), ("due_date", due_date),
-                         ("notify_before", notify_before), ("group_id", group_id)]:
+                         ("notify_before", notify_before), ("group_id", group_id),
+                         ("agent_id", agent_id)]:
                 if v is not None:
                     data[k] = v
             try:

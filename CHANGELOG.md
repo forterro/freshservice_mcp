@@ -6,6 +6,19 @@ All notable changes to freshservice-mcp are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows git tags — the CI pipeline sets chart and image versions from tags.
 
+## [1.1.0] - 2026-05-28
+
+### Added
+
+- **Problem ticket association**: new `associate_tickets` action to link incidents to a problem via `POST /problems/{id}/tickets`
+- **Problem ticket dissociation**: new `dissociate_ticket` action to unlink a ticket from a problem via `DELETE /problems/{id}/tickets/{ticket_id}`
+- **Problem ticket listing**: new `list_tickets` action to list all tickets associated with a problem via `GET /problems/{id}/tickets`
+- **Problem task agent assignment**: added `agent_id` parameter to `manage_problem_task` tool for create/update actions
+
+### Changed
+
+- **SonarQube quality gate**: enabled `sonar.qualitygate.wait=true` in sonar-project.properties for pipeline blocking on failure
+
 ## [0.5.3] - 2026-04-20
 
 ### Fixed
