@@ -294,6 +294,16 @@ class TestManageProblemTask:
             assert "task" in result or result.get("success")
 
     @pytest.mark.asyncio
+    async def test_create_with_agent_id(self, tool):
+        with patch(f"{MOD}.api_post", new_callable=AsyncMock) as m:
+            m.return_value = _ok({"task": {"id": 1, "agent_id": 42}}, 201)
+            result = await tool.fn(action="create", problem_id=1, title="Task", agent_id=42, group_id=100)
+            assert result.get("success")
+            payload = m.call_args[1]["json"]
+            assert payload["agent_id"] == 42
+            assert payload["group_id"] == 100
+
+    @pytest.mark.asyncio
     async def test_create_missing(self, tool):
         result = await tool.fn(action="create", problem_id=1)
         assert "error" in result
@@ -304,6 +314,15 @@ class TestManageProblemTask:
             m.return_value = _ok({"task": {"id": 1}})
             result = await tool.fn(action="update", problem_id=1, task_id=1, title="Updated")
             assert "error" not in result
+
+    @pytest.mark.asyncio
+    async def test_update_with_agent_id(self, tool):
+        with patch(f"{MOD}.api_put", new_callable=AsyncMock) as m:
+            m.return_value = _ok({"task": {"id": 1, "agent_id": 55}})
+            result = await tool.fn(action="update", problem_id=1, task_id=1, agent_id=55)
+            assert result.get("success")
+            payload = m.call_args[1]["json"]
+            assert payload["agent_id"] == 55
 
     @pytest.mark.asyncio
     async def test_delete(self, tool):

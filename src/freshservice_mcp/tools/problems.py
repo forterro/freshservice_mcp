@@ -335,6 +335,7 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
         problem_id: int,
         task_id: Optional[int] = None,
         # task fields
+        agent_id: Optional[int] = None,
         title: Optional[str] = None,
         description: Optional[str] = None,
         status: Optional[int] = None,
@@ -348,6 +349,7 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
             action: One of 'list', 'get', 'create', 'update', 'delete'.
             problem_id: Problem ID (always required).
             task_id: Task ID (required for get/update/delete).
+            agent_id: Assigned agent ID.
             title: Task title (required for create).
             description: Task description.
             status: 1=Open, 2=In Progress, 3=Completed.
@@ -382,7 +384,7 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
             data: Dict[str, Any] = {"title": title}
             for k, v in [("description", description), ("status", status),
                          ("due_date", due_date), ("notify_before", notify_before),
-                         ("group_id", group_id)]:
+                         ("group_id", group_id), ("agent_id", agent_id)]:
                 if v is not None:
                     data[k] = v
             try:
@@ -398,7 +400,8 @@ def register_problem_tools(mcp) -> None:  # NOSONAR
             data = {}
             for k, v in [("title", title), ("description", description),
                          ("status", status), ("due_date", due_date),
-                         ("notify_before", notify_before), ("group_id", group_id)]:
+                         ("notify_before", notify_before), ("group_id", group_id),
+                         ("agent_id", agent_id)]:
                 if v is not None:
                     data[k] = v
             try:
