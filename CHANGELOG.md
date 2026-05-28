@@ -13,6 +13,7 @@ Versioning follows git tags — the CI pipeline sets chart and image versions fr
 - **Problem ticket association**: new `associate_tickets` action to link incidents to a problem via `POST /problems/{id}/tickets`
 - **Problem ticket dissociation**: new `dissociate_ticket` action to unlink a ticket from a problem via `DELETE /problems/{id}/tickets/{ticket_id}`
 - **Problem ticket listing**: new `list_tickets` action to list all tickets associated with a problem via `GET /problems/{id}/tickets`
+- **Problem task agent assignment**: added `agent_id` parameter to `manage_problem_task` tool for create/update actions
 
 ### Changed
 
