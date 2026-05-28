@@ -1,18 +1,48 @@
 """Freshservice MCP — Shared HTTP client utilities."""
 import re
 import base64
+import json
+import time
 import httpx
 from typing import Optional, Dict, Any
 
+from .auth import forwarded_auth_var
+from .cache import cache_get, cache_set
 from .config import FRESHSERVICE_DOMAIN, FRESHSERVICE_APIKEY
+from .telemetry import API_REQUESTS, API_DURATION, _path_root, trace_span
+
+_ATTR_METHOD = "http.method"
+_ATTR_PATH_ROOT = "http.path_root"
+
+
+def _auth_header() -> str:
+    """Return the Authorization header value.
+
+    Uses the forwarded credentials from the MCP gateway when available
+    (Bearer for OAuth, Basic for API key).  Falls back to Basic Auth
+    with the env-var API key (stdio / local dev).
+    """
+    forwarded = forwarded_auth_var.get()
+    if forwarded:
+        return forwarded
+    return f"Basic {base64.b64encode(f'{FRESHSERVICE_APIKEY}:X'.encode()).decode()}"
 
 
 def get_auth_headers() -> Dict[str, str]:
-    """Return Basic-auth + JSON content-type headers."""
+    """Return Basic-auth + JSON content-type headers (for POST/PUT)."""
     return {
-        "Authorization": f"Basic {base64.b64encode(f'{FRESHSERVICE_APIKEY}:X'.encode()).decode()}",
+        "Authorization": _auth_header(),
         "Content-Type": "application/json",
     }
+
+
+def get_auth_headers_readonly() -> Dict[str, str]:
+    """Return Basic-auth headers only (for GET/DELETE).
+
+    Some Freshservice endpoints (e.g. status/pages) reject GET requests
+    that include Content-Type: application/json.
+    """
+    return {"Authorization": _auth_header()}
 
 
 def parse_link_header(link_header: str) -> Dict[str, Optional[int]]:
@@ -21,7 +51,7 @@ def parse_link_header(link_header: str) -> Dict[str, Optional[int]]:
     if not link_header:
         return pagination
     for link in link_header.split(","):
-        match = re.search(r'<(.+?)>;\s*rel="(.+?)"', link)
+        match = re.search(r'<([^>]+)>;\s*rel="([^"]+)"', link)
         if match:
             url, rel = match.groups()
             page_match = re.search(r"page=(\d+)", url)
@@ -35,28 +65,92 @@ def api_url(path: str) -> str:
     return f"https://{FRESHSERVICE_DOMAIN}/api/v2/{path.lstrip('/')}"
 
 
-async def api_get(path: str, params: Optional[Dict[str, Any]] = None) -> httpx.Response:
-    """Perform an authenticated GET request."""
-    async with httpx.AsyncClient() as client:
-        return await client.get(api_url(path), headers=get_auth_headers(), params=params)
+async def api_get(path: str, params: Optional[Dict[str, Any]] = None,
+                  headers: Optional[Dict[str, str]] = None) -> httpx.Response:
+    """Perform an authenticated GET request.
+
+    *headers* overrides the default auth-only headers.  Pass
+    ``get_auth_headers()`` for endpoints that require Content-Type
+    (e.g. ``/api/v2/pm/`` NewGen endpoints).
+    """
+    root = _path_root(path)
+    start = time.monotonic()
+    async with trace_span("api.get", {_ATTR_METHOD: "GET", _ATTR_PATH_ROOT: root}):
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                api_url(path),
+                headers=headers or get_auth_headers_readonly(),
+                params=params,
+            )
+    elapsed = time.monotonic() - start
+    API_REQUESTS.labels(method="GET", path_root=root, status_code=resp.status_code).inc()
+    API_DURATION.labels(method="GET", path_root=root).observe(elapsed)
+    return resp
 
 
-async def api_post(path: str, json: Optional[Dict[str, Any]] = None) -> httpx.Response:
+async def cached_api_get(path: str, params: Optional[Dict[str, Any]] = None,
+                         headers: Optional[Dict[str, str]] = None) -> httpx.Response:
+    """Like ``api_get`` but with transparent read cache.
+
+    Checks the cache first.  On a miss, performs the real HTTP request,
+    caches the response body (if 2xx), and returns it.  The caller gets
+    a real ``httpx.Response`` in all cases.
+    """
+    cached = await cache_get(path, params)
+    if cached is not None:
+        return httpx.Response(
+            status_code=200,
+            json=json.loads(cached),
+            request=httpx.Request("GET", api_url(path)),
+        )
+
+    resp = await api_get(path, params=params, headers=headers)
+    if resp.is_success:
+        await cache_set(path, resp.text, params)
+    return resp
+
+
+async def api_post(path: str, json: Optional[Any] = None) -> httpx.Response:
     """Perform an authenticated POST request."""
-    async with httpx.AsyncClient() as client:
-        return await client.post(api_url(path), headers=get_auth_headers(), json=json)
+    root = _path_root(path)
+    start = time.monotonic()
+    async with trace_span("api.post", {_ATTR_METHOD: "POST", _ATTR_PATH_ROOT: root}):
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(api_url(path), headers=get_auth_headers(), json=json)
+    elapsed = time.monotonic() - start
+    API_REQUESTS.labels(method="POST", path_root=root, status_code=resp.status_code).inc()
+    API_DURATION.labels(method="POST", path_root=root).observe(elapsed)
+    return resp
 
 
 async def api_put(path: str, json: Optional[Dict[str, Any]] = None) -> httpx.Response:
     """Perform an authenticated PUT request."""
-    async with httpx.AsyncClient() as client:
-        return await client.put(api_url(path), headers=get_auth_headers(), json=json)
+    root = _path_root(path)
+    start = time.monotonic()
+    async with trace_span("api.put", {_ATTR_METHOD: "PUT", _ATTR_PATH_ROOT: root}):
+        async with httpx.AsyncClient() as client:
+            resp = await client.put(api_url(path), headers=get_auth_headers(), json=json)
+    elapsed = time.monotonic() - start
+    API_REQUESTS.labels(method="PUT", path_root=root, status_code=resp.status_code).inc()
+    API_DURATION.labels(method="PUT", path_root=root).observe(elapsed)
+    return resp
 
 
-async def api_delete(path: str) -> httpx.Response:
+async def api_delete(path: str,
+                     headers: Optional[Dict[str, str]] = None) -> httpx.Response:
     """Perform an authenticated DELETE request."""
-    async with httpx.AsyncClient() as client:
-        return await client.delete(api_url(path), headers=get_auth_headers())
+    root = _path_root(path)
+    start = time.monotonic()
+    async with trace_span("api.delete", {_ATTR_METHOD: "DELETE", _ATTR_PATH_ROOT: root}):
+        async with httpx.AsyncClient() as client:
+            resp = await client.delete(
+                api_url(path),
+                headers=headers or get_auth_headers_readonly(),
+            )
+    elapsed = time.monotonic() - start
+    API_REQUESTS.labels(method="DELETE", path_root=root, status_code=resp.status_code).inc()
+    API_DURATION.labels(method="DELETE", path_root=root).observe(elapsed)
+    return resp
 
 
 def handle_error(e: Exception, action: str = "request") -> Dict[str, Any]:

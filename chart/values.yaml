@@ -1,0 +1,118 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/forterro/freshservice_mcp
+  tag: ""  # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Freshservice MCP server configuration (non-sensitive)
+config:
+  MCP_TRANSPORT: streamable-http
+  MCP_HOST: "0.0.0.0"
+  MCP_PORT: "8000"
+  FRESHSERVICE_DOMAIN: ""
+  # FRESHSERVICE_SCOPES: ""  # comma-separated, empty = all scopes
+
+# -- Cache configuration
+cache:
+  # TTL for reference data (agents, departments, groups…) in seconds
+  ttlReference: 43200    # 12 hours
+  # TTL for operational data (tickets, changes, assets…) in seconds
+  ttlOperational: 300    # 5 minutes
+
+# -- External Redis for read caching (optional).
+# When enabled, the server uses Redis for the tiered cache.
+# When disabled, an in-memory TTL cache is used instead.
+externalRedis:
+  enabled: false
+  # Redis connection URL (e.g. redis://:password@host:6379/0)
+  # Set directly or via existingSecret.
+  url: ""
+  # Use an existing Secret containing the full Redis URL.
+  existingSecret: ""
+  existingSecretKey: "REDIS_URL"
+  # Use an existing Secret for the Redis password (injected separately).
+  # The password is merged into the URL at runtime.
+  passwordSecret: ""
+  passwordSecretKey: "password"
+
+# -- Sensitive values injected as env vars from a Secret.
+# Set these or use existingSecret.
+secret:
+  FRESHSERVICE_APIKEY: ""
+
+# -- Use an existing Secret instead of creating one.
+# The Secret must contain the keys listed in secret{} above.
+existingSecret: ""
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# -- Extra env vars (list of {name, value} or {name, valueFrom})
+extraEnv: []
+
+# -- Extra envFrom (list of secretRef/configMapRef)
+extraEnvFrom: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# -- PodDisruptionBudget (recommended when replicaCount > 1)
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+podAnnotations: {}
+podLabels: {}
+
+serviceAccount:
+  create: false
+  name: ""
+
+# -- Liveness / readiness probes (HTTP path on MCP_PORT).
+# SSE transport exposes /sse; streamable-http exposes /mcp.
+probes:
+  liveness:
+    enabled: true
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 30
+  readiness:
+    enabled: true
+    path: /healthz
+    initialDelaySeconds: 3
+    periodSeconds: 10
+
+# -- Prometheus metrics endpoint
+metrics:
+  enabled: true
+  path: /metrics
+  # -- Create a ServiceMonitor for Prometheus Operator / Alloy
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    # Extra labels for ServiceMonitor (e.g. release: prometheus)
+    labels: {}
+
+# -- OpenTelemetry tracing (optional)
+tracing:
+  enabled: false
+  # OTLP collector endpoint (gRPC)
+  otlpEndpoint: ""
+  # Override service name (default: freshservice-mcp)
+  serviceName: freshservice-mcp

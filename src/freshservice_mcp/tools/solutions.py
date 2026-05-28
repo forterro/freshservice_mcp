@@ -5,14 +5,16 @@ Exposes 1 tool instead of the original 13:
 """
 from typing import Any, Dict, List, Optional
 
-from ..http_client import api_get, api_post, api_put, handle_error
+from ..http_client import cached_api_get as api_get, api_post, api_put, handle_error
+
+_ERR_NO_FIELDS = "No fields provided for update"
 
 
-def register_solutions_tools(mcp) -> None:
+def register_solutions_tools(mcp) -> None:  # NOSONAR
     """Register solution-related tools on *mcp*."""
 
     @mcp.tool()
-    async def manage_solution(
+    async def manage_solution(  # NOSONAR
         action: str,
         # identifiers
         category_id: Optional[int] = None,
@@ -102,7 +104,7 @@ def register_solutions_tools(mcp) -> None:
                 if v is not None:
                     data[k] = v
             if not data:
-                return {"error": "No fields provided for update"}
+                return {"error": _ERR_NO_FIELDS}
             try:
                 resp = await api_put(f"solutions/categories/{category_id}", json=data)
                 resp.raise_for_status()
@@ -158,7 +160,7 @@ def register_solutions_tools(mcp) -> None:
                 if v is not None:
                     data[k] = v
             if not data:
-                return {"error": "No fields provided for update"}
+                return {"error": _ERR_NO_FIELDS}
             try:
                 resp = await api_put(f"solutions/folders/{folder_id}", json=data)
                 resp.raise_for_status()
@@ -219,7 +221,7 @@ def register_solutions_tools(mcp) -> None:
                 if v is not None:
                     data[k] = v
             if not data:
-                return {"error": "No fields provided for update"}
+                return {"error": _ERR_NO_FIELDS}
             try:
                 resp = await api_put(f"solutions/articles/{article_id}", json=data)
                 resp.raise_for_status()

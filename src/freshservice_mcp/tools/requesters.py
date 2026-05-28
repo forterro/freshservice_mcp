@@ -6,17 +6,17 @@ Exposes 2 tools instead of the original 12:
 """
 from typing import Any, Dict, List, Optional
 
-from ..http_client import api_get, api_post, api_put, handle_error, parse_link_header
+from ..http_client import cached_api_get as api_get, api_post, api_put, handle_error, parse_link_header
 
 
-def register_requesters_tools(mcp) -> None:
+def register_requesters_tools(mcp) -> None:  # NOSONAR
     """Register requester-related tools on *mcp*."""
 
     # ------------------------------------------------------------------ #
     #  manage_requester                                                   #
     # ------------------------------------------------------------------ #
     @mcp.tool()
-    async def manage_requester(
+    async def manage_requester(  # NOSONAR
         action: str,
         requester_id: Optional[int] = None,
         # create / update
@@ -96,13 +96,13 @@ def register_requesters_tools(mcp) -> None:
         if action == "filter":
             if not query:
                 return {"error": "query required for filter"}
-            import urllib.parse
-            encoded = urllib.parse.quote(query)
-            params: Dict[str, Any] = {}
+            params: Dict[str, Any] = {
+                "query": query,
+            }
             if include_agents:
                 params["include_agents"] = "true"
             try:
-                resp = await api_get(f"requesters?query={encoded}", params=params)
+                resp = await api_get("requesters", params=params)
                 resp.raise_for_status()
                 return resp.json()
             except Exception as e:

@@ -1,15 +1,15 @@
 """Freshservice MCP — Canned Responses & Workspaces tools (consolidated).
 
-Exposes 2 tools instead of the original 6:
+Exposes 2 tools:
   • manage_canned_response — list + get (responses & folders)
   • manage_workspace       — list + get
 """
 from typing import Any, Dict, Optional
 
-from ..http_client import api_get, handle_error
+from ..http_client import cached_api_get as api_get, handle_error
 
 
-def register_misc_tools(mcp) -> None:
+def register_misc_tools(mcp) -> None:  # NOSONAR
     """Register canned response and workspace tools on *mcp*."""
 
     # ------------------------------------------------------------------ #

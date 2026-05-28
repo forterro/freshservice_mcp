@@ -19,7 +19,7 @@ from ..config import (
 )
 from ..http_client import (
     api_delete,
-    api_get,
+    cached_api_get as api_get,
     api_post,
     api_put,
     api_url,
@@ -39,14 +39,14 @@ def _validate_pagination(page: int, per_page: int) -> Optional[Dict[str, Any]]:
 
 
 # ── registration ───────────────────────────────────────────────────────────
-def register_tickets_tools(mcp) -> None:
+def register_tickets_tools(mcp) -> None:  # NOSONAR
     """Register ticket-related tools on *mcp*."""
 
     # ------------------------------------------------------------------ #
     #  manage_ticket                                                      #
     # ------------------------------------------------------------------ #
     @mcp.tool()
-    async def manage_ticket(
+    async def manage_ticket(  # NOSONAR
         action: str,
         ticket_id: Optional[int] = None,
         # create / update fields
