@@ -6,6 +6,12 @@ All notable changes to freshservice-mcp are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows git tags — the CI pipeline sets chart and image versions from tags.
 
+## [1.1.1] - 2026-10-22
+
+### Fixed
+
+- **Release build for bare version tags**: the Build & Publish workflow only ran on `v*` tags, so the `1.1.0` tag never produced an image or a Helm chart (production stayed on 0.5.5). The workflow now also runs on bare semver tags (`X.Y.Z`) and on `hotfix/**` branches, and derives the chart version from any tag. This release ships the 1.1.0 features (including `agent_id` on `manage_problem_task`).
+
 ## [1.1.0] - 2026-05-28
 
 ### Added
