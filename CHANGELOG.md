@@ -6,7 +6,7 @@ All notable changes to freshservice-mcp are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows git tags — the CI pipeline sets chart and image versions from tags.
 
-## [Unreleased]
+## [1.1.2] - 2026-11-17
 
 ### Security
 
