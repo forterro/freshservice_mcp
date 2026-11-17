@@ -162,20 +162,16 @@ class TestMemoryCache:
         # Entry is cleaned up
         assert "k2" not in cache._mem_cache
 
-    def test_eviction_at_max_entries(self):
+    def test_eviction_at_max_entries(self, monkeypatch):
         """When at capacity, oldest entry should be evicted."""
-        original_max = cache._MEM_MAX_ENTRIES
-        try:
-            cache._MEM_MAX_ENTRIES = 3
-            cache._mem_set("a", "1", ttl=100)
-            cache._mem_set("b", "2", ttl=200)
-            cache._mem_set("c", "3", ttl=300)
-            # At capacity — next set should evict earliest-expiring
-            cache._mem_set("d", "4", ttl=400)
-            assert len(cache._mem_cache) == 3
-            assert cache._mem_get("d") == "4"
-        finally:
-            cache._MEM_MAX_ENTRIES = original_max
+        monkeypatch.setattr(cache, "_MEM_MAX_ENTRIES", 3)
+        cache._mem_set("a", "1", ttl=100)
+        cache._mem_set("b", "2", ttl=200)
+        cache._mem_set("c", "3", ttl=300)
+        # At capacity — next set should evict earliest-expiring
+        cache._mem_set("d", "4", ttl=400)
+        assert len(cache._mem_cache) == 3
+        assert cache._mem_get("d") == "4"
 
     def test_invalidate_specific(self):
         with patch(f"{MOD}._cache_key", return_value="test_key"):
