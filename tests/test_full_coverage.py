@@ -1080,7 +1080,7 @@ class TestReleasesFull:
             result = await tool.fn(action="filter", query="status:1")
             assert "releases" in result
             params = m.call_args.kwargs["params"]
-            assert '"status:1"' == params["query"]
+            assert params["query"] == '"status:1"'
 
     @pytest.mark.asyncio
     async def test_filter_missing_query(self, tool):
