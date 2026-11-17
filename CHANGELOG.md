@@ -6,6 +6,14 @@ All notable changes to freshservice-mcp are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows git tags — the CI pipeline sets chart and image versions from tags.
 
+## [1.1.2] - 2026-11-17
+
+### Security
+
+- **Starlette upgraded to 1.10.0** (was 0.46.2) and pinned to `>=1.0.1` to fix CVE-2026-48710 ("BadHost": a crafted
+  Host header poisons `request.url.path` and bypasses path-based security checks). Not exploitable in this server
+  (no path-based security check), fixed as hygiene after the IT Security LiteLLM / Starlette advisory of 2026-11-17.
+
 ## [1.1.1] - 2026-10-22
 
 ### Fixed

@@ -158,7 +158,7 @@ class TestProblemsFull:
             )
             assert "problems" in result
             params = m.call_args.kwargs["params"]
-            assert '"priority:3"' == params["query"]
+            assert params["query"] == '"priority:3"'
 
     @pytest.mark.asyncio
     async def test_filter_missing_query(self, tools):

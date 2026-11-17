@@ -680,7 +680,7 @@ class TestDepartmentsFull:
             assert "departments" in result
             # Verify the query is wrapped in quotes
             call_params = m.call_args.kwargs["params"]
-            assert '"name:\'IT\'"' == call_params["query"]
+            assert call_params["query"] == '"name:\'IT\'"'
 
     @pytest.mark.asyncio
     async def test_filter_missing_query(self, dept_tool):
@@ -1080,7 +1080,7 @@ class TestReleasesFull:
             result = await tool.fn(action="filter", query="status:1")
             assert "releases" in result
             params = m.call_args.kwargs["params"]
-            assert '"status:1"' == params["query"]
+            assert params["query"] == '"status:1"'
 
     @pytest.mark.asyncio
     async def test_filter_missing_query(self, tool):
