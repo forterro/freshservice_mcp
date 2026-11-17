@@ -50,7 +50,7 @@ class ForwardedAuthMiddleware:
             auth = request.headers.get("authorization", "")
             auth_lower = auth.lower()
             forwarded: str | None = None
-            if auth_lower.startswith("bearer ") or auth_lower.startswith("basic "):
+            if auth_lower.startswith(("bearer ", "basic ")):
                 forwarded = auth
             # Count auth mode only for MCP traffic (skip infra endpoints)
             path = request.url.path

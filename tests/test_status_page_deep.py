@@ -36,12 +36,11 @@ def _http_error(status=422, body="Validation Error"):
 
 
 @pytest.fixture(autouse=True)
-def reset_caches():
+def reset_caches(monkeypatch):
     """Reset module-level caches before each test."""
     import freshservice_mcp.tools.status_page as sp_mod
-    sp_mod._cached_workspace_id = None
-    sp_mod._cached_status_page_id = None
-    yield
+    monkeypatch.setattr(sp_mod, "_cached_workspace_id", None)
+    monkeypatch.setattr(sp_mod, "_cached_status_page_id", None)
 
 
 @pytest.fixture
