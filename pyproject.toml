@@ -10,6 +10,8 @@ dependencies = [
     "mcp[cli]>=1.8.0",
     "pydantic>=2.10.6",
     "prometheus-client>=0.21",
+    # CVE-2026-48710 (BadHost): Host header poisons request.url.path in starlette <= 1.0.0
+    "starlette>=1.0.1",
 ]
 
 [project.optional-dependencies]
